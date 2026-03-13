@@ -32,6 +32,39 @@ bat\build.bat
 bat\publish.bat
 ```
 
+默认依赖路径：
+
+```text
+MAKENSIS_PATH -> 直接指向 makensis.exe
+NSIS_PATH     -> NSIS 目录或 makensis.exe
+NSIS_HOME     -> NSIS 安装目录
+PATH          -> where makensis.exe
+```
+
+默认兜底目录：
+
+```text
+C:\Program Files (x86)\NSIS\makensis.exe
+C:\Program Files\NSIS\makensis.exe
+```
+
+脚本使用的项目路径：
+
+```text
+输入：
+- build\bin\ant-chrome.exe
+- publish\config.init.yaml
+- bin\xray.exe
+- bin\sing-box.exe
+- chrome\
+
+临时目录：
+- publish\staging\
+
+输出：
+- publish\output\AntBrowser-Setup-<version>.exe
+```
+
 产物：
 
 ```text
