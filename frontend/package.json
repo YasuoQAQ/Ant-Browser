@@ -1,0 +1,38 @@
+{
+  "name": "ant-browser-frontend",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "node ./scripts/dev-watcher.mjs",
+    "dev:raw": "cross-env NODE_OPTIONS=--max-old-space-size=500 vite",
+    "build": "cross-env NODE_OPTIONS=--max-old-space-size=1024 tsc && cross-env NODE_OPTIONS=--max-old-space-size=1024 vite build",
+    "preview": "cross-env NODE_OPTIONS=--max-old-space-size=500 vite preview"
+  },
+  "dependencies": {
+    "@types/js-yaml": "^4.0.9",
+    "clsx": "^2.0.0",
+    "js-yaml": "^4.1.1",
+    "lucide-react": "^0.292.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-markdown": "^9.0.1",
+    "react-router-dom": "^6.20.0",
+    "recharts": "^2.10.3",
+    "rehype-raw": "^7.0.0",
+    "rehype-sanitize": "^6.0.0",
+    "remark-gfm": "^4.0.0",
+    "zustand": "^4.4.7"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.43",
+    "@types/react-dom": "^18.2.17",
+    "@vitejs/plugin-react": "^4.2.1",
+    "autoprefixer": "^10.4.16",
+    "cross-env": "^10.1.0",
+    "postcss": "^8.4.32",
+    "tailwindcss": "^3.3.6",
+    "typescript": "^5.3.3",
+    "vite": "^5.0.8"
+  }
+}
