@@ -1,15 +1,80 @@
+export interface BrowserRuntimeSummary {
+  effectiveProxy?: string
+  requestedLaunchArgs?: string[]
+  requestedStartUrls?: string[]
+  wsEndpoint?: string
+  resetUserData?: boolean
+  lastStartAt?: string
+  lastStopAt?: string
+  lastError?: string
+  debugPort?: number
+  pid?: number
+  running: boolean
+}
+
+export interface ProfilePreferences {
+  // 显示
+  showWindowName?: boolean
+  // 书签
+  customBookmarks?: boolean
+  // 同步
+  syncBookmarks?: boolean
+  syncHistory?: boolean
+  syncTabs?: boolean
+  syncCookies?: boolean
+  syncExtensions?: boolean
+  syncPasswords?: boolean
+  syncIndexedDB?: boolean
+  syncLocalStorage?: boolean
+  syncSessionStorage?: boolean
+  // 启动前清理
+  clearCacheOnStart?: boolean
+  clearCookiesOnStart?: boolean
+  clearLocalStorageOnStart?: boolean
+  // 指纹
+  randomFingerprintOnStart?: boolean
+  // 浏览器行为
+  disablePasswordPrompt?: boolean
+  // 安全检查
+  stopOnNetworkFail?: boolean
+  stopOnIPChange?: boolean
+}
+
+export interface FingerprintConfigData {
+  seed?: string
+  brand?: string
+  brandVersion?: string
+  platform?: string
+  platformVersion?: string
+  lang?: string
+  acceptLang?: string
+  timezone?: string
+  resolution?: string
+  customResolution?: string
+  hardwareConcurrency?: string
+  disableWebrtcUdp?: boolean
+  spoofCanvas?: boolean
+  spoofAudio?: boolean
+  spoofFont?: boolean
+  spoofClientRects?: boolean
+  spoofGpu?: boolean
+  unknownArgs?: string[]
+}
+
 export interface BrowserProfile {
   profileId: string
   profileName: string
   userDataDir: string
   coreId: string
   fingerprintArgs: string[]
+  fingerprintConfig?: FingerprintConfigData
   proxyId: string
   proxyConfig: string
   launchArgs: string[]
   tags: string[]
   keywords: string[]
   groupId?: string
+  preferences?: ProfilePreferences
   running: boolean
   debugPort: number
   pid: number
@@ -19,6 +84,12 @@ export interface BrowserProfile {
   lastStartAt?: string
   lastStopAt?: string
   launchCode?: string
+  runtime?: BrowserRuntimeSummary
+  effectiveProxy?: string
+  requestedLaunchArgs?: string[]
+  requestedStartUrls?: string[]
+  wsEndpoint?: string
+  resetUserData?: boolean
 }
 
 export interface BrowserProfileInput {
@@ -26,12 +97,14 @@ export interface BrowserProfileInput {
   userDataDir: string
   coreId: string
   fingerprintArgs: string[]
+  fingerprintConfig?: FingerprintConfigData
   proxyId: string
   proxyConfig: string
   launchArgs: string[]
   tags: string[]
   keywords: string[]
   groupId?: string
+  preferences?: ProfilePreferences
 }
 
 export interface BrowserTab {

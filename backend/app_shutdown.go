@@ -33,6 +33,10 @@ func (a *App) stopRuntimeServices() {
 			a.clashMgr.StopAll()
 		}
 
+		if a.ipfoxyMgr != nil {
+			a.ipfoxyMgr.Shutdown()
+		}
+
 		if a.speedScheduler != nil {
 			a.speedScheduler.Stop()
 			a.speedScheduler = nil
@@ -43,6 +47,13 @@ func (a *App) stopRuntimeServices() {
 				log.Error("LaunchServer 关闭失败", logger.F("error", err))
 			}
 			a.launchServer = nil
+		}
+
+		if a.apiServer != nil {
+			if err := a.apiServer.Stop(); err != nil {
+				log.Error("API Server 关闭失败", logger.F("error", err))
+			}
+			a.apiServer = nil
 		}
 
 		if err := killResidualRuntimeProcesses(a.appRoot); err != nil {

@@ -76,6 +76,10 @@ func ValidateProxyConfig(proxyConfig string, proxies []config.BrowserProxy, prox
 	if strings.HasPrefix(l, "http://") || strings.HasPrefix(l, "https://") || strings.HasPrefix(l, "socks5://") {
 		return true, ""
 	}
+	// IPFoxy 认证代理，通过桥接支持
+	if IsIPFoxyProxy(src) {
+		return true, ""
+	}
 	// hysteria2/tuic 通过 sing-box 支持，先做可解析性校验
 	if IsSingBoxProtocol(src) {
 		if _, err := BuildSingBoxOutbound(src); err != nil {

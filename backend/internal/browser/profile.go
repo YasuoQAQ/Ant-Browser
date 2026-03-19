@@ -80,6 +80,7 @@ func (m *Manager) loadProfiles() {
 			UserDataDir:     item.UserDataDir,
 			CoreId:          item.CoreId,
 			FingerprintArgs: append([]string{}, item.FingerprintArgs...),
+			FingerprintConfig: ParseFingerprintArgs(item.FingerprintArgs),
 			ProxyId:         item.ProxyId,
 			ProxyConfig:     item.ProxyConfig,
 			LaunchArgs:      append([]string{}, item.LaunchArgs...),
@@ -209,11 +210,6 @@ func (m *Manager) Create(input ProfileInput) (*Profile, error) {
 	m.Mutex.Lock()
 	defer m.Mutex.Unlock()
 
-	// Check Profile Limit
-	if m.Config.App.MaxProfileLimit > 0 && len(m.Profiles) >= m.Config.App.MaxProfileLimit {
-		return nil, fmt.Errorf("实例数量已达上限 (%d个)，无法创建新的实例。请兑换额度后重试！", m.Config.App.MaxProfileLimit)
-	}
-
 	now := time.Now().Format(time.RFC3339)
 	profileId := uuid.NewString()
 	userDataDir := strings.TrimSpace(input.UserDataDir)
@@ -239,18 +235,20 @@ func (m *Manager) Create(input ProfileInput) (*Profile, error) {
 		proxyConfig = m.Config.Browser.DefaultProxy
 	}
 	profile := &Profile{
-		ProfileId:       profileId,
-		ProfileName:     input.ProfileName,
-		UserDataDir:     userDataDir,
-		CoreId:          coreId,
-		FingerprintArgs: input.FingerprintArgs,
-		ProxyId:         proxyId,
+		ProfileId:         profileId,
+		ProfileName:       input.ProfileName,
+		UserDataDir:       userDataDir,
+		CoreId:            coreId,
+		FingerprintArgs:   input.FingerprintArgs,
+		FingerprintConfig: ParseFingerprintArgs(input.FingerprintArgs),
+		ProxyId:           proxyId,
 		ProxyConfig:     proxyConfig,
 		LaunchArgs:      input.LaunchArgs,
 		Tags:            input.Tags,
 		Keywords:        append([]string{}, input.Keywords...),
-		GroupId:         strings.TrimSpace(input.GroupId),
-		Running:         false,
+		GroupId:           strings.TrimSpace(input.GroupId),
+		Preferences:       input.Preferences,
+		Running:           false,
 		DebugPort:       0,
 		Pid:             0,
 		LastError:       "",
@@ -285,6 +283,7 @@ func (m *Manager) Update(profileId string, input ProfileInput) (*Profile, error)
 	profile.UserDataDir = input.UserDataDir
 	profile.CoreId = input.CoreId
 	profile.FingerprintArgs = input.FingerprintArgs
+	profile.FingerprintConfig = ParseFingerprintArgs(input.FingerprintArgs)
 	profile.ProxyId = strings.TrimSpace(input.ProxyId)
 	if profile.ProxyId != "" {
 		if resolved, ok := m.GetProxyConfigById(profile.ProxyId); ok {
@@ -300,6 +299,7 @@ func (m *Manager) Update(profileId string, input ProfileInput) (*Profile, error)
 	profile.Tags = input.Tags
 	profile.Keywords = append([]string{}, input.Keywords...)
 	profile.GroupId = strings.TrimSpace(input.GroupId)
+	profile.Preferences = input.Preferences
 	profile.UpdatedAt = time.Now().Format(time.RFC3339)
 	log.Info("浏览器配置更新", logger.F("profile_id", profileId), logger.F("profile_name", input.ProfileName))
 	if err := m.SaveProfiles(); err != nil {
@@ -381,12 +381,6 @@ func (m *Manager) Copy(profileId string, newName string) (*Profile, error) {
 	m.Mutex.Lock()
 	defer m.Mutex.Unlock()
 
-	// Check Profile Limit
-	if m.Config.App.MaxProfileLimit > 0 && len(m.Profiles) >= m.Config.App.MaxProfileLimit {
-		log.Error("复制实例失败: 达到数量上限", logger.F("limit", m.Config.App.MaxProfileLimit))
-		return nil, fmt.Errorf("实例数量已达上限 (%d个)，无法复制实例。请兑换额度后重试！", m.Config.App.MaxProfileLimit)
-	}
-
 	src, exists := m.Profiles[profileId]
 	if !exists {
 		log.Error("源实例不存在", logger.F("profile_id", profileId))
@@ -409,6 +403,7 @@ func (m *Manager) Copy(profileId string, newName string) (*Profile, error) {
 		UserDataDir:     newId, // 新的用户数据目录
 		CoreId:          src.CoreId,
 		FingerprintArgs: append([]string{}, m.Config.Browser.DefaultFingerprintArgs...), // 使用默认指纹（新种子）
+		FingerprintConfig: ParseFingerprintArgs(m.Config.Browser.DefaultFingerprintArgs),
 		ProxyId:         src.ProxyId,
 		ProxyConfig:     src.ProxyConfig,
 		LaunchArgs:      append([]string{}, src.LaunchArgs...),

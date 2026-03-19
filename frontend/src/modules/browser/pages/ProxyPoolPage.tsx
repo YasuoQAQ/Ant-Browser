@@ -551,6 +551,10 @@ export function ProxyPoolPage() {
   const [editForm, setEditForm] = useState({ proxyName: '', proxyConfig: '', dnsServers: '', groupName: '' })
   const [saving, setSaving] = useState(false)
 
+  const [addModalOpen, setAddModalOpen] = useState(false)
+  const [addForm, setAddForm] = useState({ proxyName: '', proxyConfig: '', dnsServers: '', groupName: '' })
+  const [adding, setAdding] = useState(false)
+
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [ipHealthDetailOpen, setIPHealthDetailOpen] = useState(false)
@@ -1210,6 +1214,29 @@ export function ProxyPoolPage() {
     }
   }
 
+  const handleAddProxy = async () => {
+    if (!addForm.proxyName.trim()) { toast.error('请输入代理名称'); return }
+    if (!addForm.proxyConfig.trim()) { toast.error('请输入代理配置'); return }
+    setAdding(true)
+    try {
+      const newProxy: BrowserProxy = {
+        proxyId: nextProxyID(),
+        proxyName: addForm.proxyName.trim(),
+        proxyConfig: addForm.proxyConfig.trim(),
+        dnsServers: addForm.dnsServers.trim(),
+        groupName: addForm.groupName.trim(),
+      }
+      await saveProxies([...proxies, newProxy])
+      setAddModalOpen(false)
+      setAddForm({ proxyName: '', proxyConfig: '', dnsServers: '', groupName: '' })
+      toast.success('代理已添加')
+    } catch (error: any) {
+      toast.error(error?.message || '添加失败')
+    } finally {
+      setAdding(false)
+    }
+  }
+
   const handleDeleteClick = (proxyId: string) => {
     setDeletingId(proxyId)
     setDeleteConfirmOpen(true)
@@ -1372,6 +1399,7 @@ export function ProxyPoolPage() {
           <Button size="sm" variant="secondary" onClick={handleCheckAllIPHealth} loading={checkingAllIPHealth} disabled={filteredList.length === 0}>检测IP健康</Button>
           <Button size="sm" variant="secondary" onClick={handleTestAll} loading={testingAll} disabled={filteredList.length === 0}>测试全部</Button>
           <Button size="sm" onClick={() => setImportModalOpen(true)}>导入 Clash</Button>
+          <Button size="sm" onClick={() => { setAddForm({ proxyName: '', proxyConfig: '', dnsServers: '', groupName: '' }); setAddModalOpen(true) }}>手动添加</Button>
         </div>
       </div>
 
@@ -1559,6 +1587,30 @@ export function ProxyPoolPage() {
             <Textarea value={editForm.dnsServers} onChange={e => setEditForm(prev => ({ ...prev, dnsServers: e.target.value }))} rows={6}
               placeholder={`dns:\n  enable: true\n  nameserver:\n    - 119.29.29.29\n    - 223.5.5.5`} />
             <p className="text-xs text-[var(--color-text-muted)] mt-1">支持 Clash dns: YAML 格式，留空则使用系统默认 DNS</p>
+          </FormItem>
+        </div>
+      </Modal>
+
+      <Modal open={addModalOpen} onClose={() => setAddModalOpen(false)} title="手动添加代理" width="500px"
+        footer={<><Button variant="secondary" onClick={() => setAddModalOpen(false)}>取消</Button><Button onClick={handleAddProxy} loading={adding}>添加</Button></>}>
+        <div className="space-y-4">
+          <FormItem label="代理名称" required>
+            <Input value={addForm.proxyName} onChange={e => setAddForm(prev => ({ ...prev, proxyName: e.target.value }))} placeholder="例如：IPFoxy-新加坡" />
+          </FormItem>
+          <FormItem label="分组名称（可选）">
+            <Input value={addForm.groupName} onChange={e => setAddForm(prev => ({ ...prev, groupName: e.target.value }))} placeholder="例如：IPFoxy、香港" list="add-proxy-groups-datalist" />
+            <datalist id="add-proxy-groups-datalist">
+              {groups.map(g => <option key={g} value={g} />)}
+            </datalist>
+          </FormItem>
+          <FormItem label="代理配置" required>
+            <Textarea value={addForm.proxyConfig} onChange={e => setAddForm(prev => ({ ...prev, proxyConfig: e.target.value }))} rows={4}
+              placeholder={`支持格式：\nipfoxy://host:port:username:password\nsocks5://host:port\nhttp://host:port\n或 Clash YAML 格式`} />
+            <p className="text-xs text-[var(--color-text-muted)] mt-1">支持 ipfoxy://、socks5://、http:// 等格式，也支持 Clash YAML 格式</p>
+          </FormItem>
+          <FormItem label="DNS 服务器（可选）">
+            <Textarea value={addForm.dnsServers} onChange={e => setAddForm(prev => ({ ...prev, dnsServers: e.target.value }))} rows={4}
+              placeholder={`dns:\n  enable: true\n  nameserver:\n    - 119.29.29.29\n    - 223.5.5.5`} />
           </FormItem>
         </div>
       </Modal>

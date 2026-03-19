@@ -218,12 +218,24 @@ export function ClearAppLogs() {
   return window['go']['main']['App']['ClearAppLogs']();
 }
 
+export function ClearCookies(arg1) {
+  return window['go']['main']['App']['ClearCookies'](arg1);
+}
+
 export function CreateGroup(arg1) {
   return window['go']['main']['App']['CreateGroup'](arg1);
 }
 
+export function CreateProfile(arg1) {
+  return window['go']['main']['App']['CreateProfile'](arg1);
+}
+
 export function DeleteGroup(arg1) {
   return window['go']['main']['App']['DeleteGroup'](arg1);
+}
+
+export function DeleteProfile(arg1) {
+  return window['go']['main']['App']['DeleteProfile'](arg1);
 }
 
 export function FetchRemoteAuthorProfile(arg1, arg2) {
@@ -238,6 +250,10 @@ export function GenerateCDKeys(arg1) {
   return window['go']['main']['App']['GenerateCDKeys'](arg1);
 }
 
+export function GetAPIServerInfo() {
+  return window['go']['main']['App']['GetAPIServerInfo']();
+}
+
 export function GetAppConfig() {
   return window['go']['main']['App']['GetAppConfig']();
 }
@@ -248,6 +264,10 @@ export function GetAppLogs() {
 
 export function GetBrowserSettings() {
   return window['go']['main']['App']['GetBrowserSettings']();
+}
+
+export function GetCookies(arg1, arg2) {
+  return window['go']['main']['App']['GetCookies'](arg1, arg2);
 }
 
 export function GetDashboardStats() {
@@ -274,12 +294,20 @@ export function GetMemoryStats() {
   return window['go']['main']['App']['GetMemoryStats']();
 }
 
+export function GetProfile(arg1) {
+  return window['go']['main']['App']['GetProfile'](arg1);
+}
+
 export function GetRunningInstances() {
   return window['go']['main']['App']['GetRunningInstances']();
 }
 
 export function ListGroups() {
   return window['go']['main']['App']['ListGroups']();
+}
+
+export function ListProfiles() {
+  return window['go']['main']['App']['ListProfiles']();
 }
 
 export function MoveInstancesToGroup(arg1, arg2) {
@@ -314,6 +342,10 @@ export function SaveBrowserSettings(arg1) {
   return window['go']['main']['App']['SaveBrowserSettings'](arg1);
 }
 
+export function SetCookies(arg1, arg2) {
+  return window['go']['main']['App']['SetCookies'](arg1, arg2);
+}
+
 export function SetLogLevel(arg1) {
   return window['go']['main']['App']['SetLogLevel'](arg1);
 }
@@ -324,6 +356,10 @@ export function StartInstance(arg1) {
 
 export function StartInstanceWithParams(arg1, arg2) {
   return window['go']['main']['App']['StartInstanceWithParams'](arg1, arg2);
+}
+
+export function StopInstance(arg1) {
+  return window['go']['main']['App']['StopInstance'](arg1);
 }
 
 export function TestProxyConnectivity(arg1, arg2) {
@@ -340,6 +376,10 @@ export function TriggerGC() {
 
 export function UpdateGroup(arg1, arg2) {
   return window['go']['main']['App']['UpdateGroup'](arg1, arg2);
+}
+
+export function UpdateProfile(arg1, arg2) {
+  return window['go']['main']['App']['UpdateProfile'](arg1, arg2);
 }
 
 export function ValidateProxyConfig(arg1, arg2) {

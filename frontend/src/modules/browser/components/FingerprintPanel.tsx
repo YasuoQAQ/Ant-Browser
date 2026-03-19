@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { ChevronDown, ChevronUp, RefreshCw, Wand2 } from 'lucide-react'
+import { useEffect, useState, useMemo } from 'react'
+import { AlertTriangle, ChevronDown, ChevronUp, Info, RefreshCw, Wand2 } from 'lucide-react'
 import { ConfirmModal, FormItem, Input, Select, Textarea } from '../../../shared/components'
 import {
   type FingerprintConfig,
@@ -10,6 +10,7 @@ import {
   randomFingerprintSeed,
   serialize,
 } from '../utils/fingerprintSerializer'
+import { validateFingerprint } from '../utils/fingerprintValidator'
 
 interface FingerprintPanelProps {
   value: string[]
@@ -17,17 +18,17 @@ interface FingerprintPanelProps {
 }
 
 const BRAND_OPTIONS = [
-  { value: '', label: '不设置' },
+  { value: '', label: '不设置（默认 Chromium）' },
   { value: 'Chrome', label: 'Chrome' },
   { value: 'Edge', label: 'Edge' },
-  { value: 'Firefox', label: 'Firefox' },
-  { value: 'Safari', label: 'Safari' },
+  { value: 'Opera', label: 'Opera' },
+  { value: 'Vivaldi', label: 'Vivaldi' },
 ]
 
 const PLATFORM_OPTIONS = [
   { value: '', label: '不设置' },
   { value: 'windows', label: 'Windows' },
-  { value: 'mac', label: 'macOS' },
+  { value: 'macos', label: 'macOS' },
   { value: 'linux', label: 'Linux' },
 ]
 
@@ -45,7 +46,6 @@ const LANG_OPTIONS = [
 const TIMEZONE_OPTIONS = [
   { value: '', label: '不设置' },
   { value: 'system', label: '跟随系统时区' },
-  // 亚洲
   { value: 'Asia/Shanghai', label: 'Asia/Shanghai (UTC+8)' },
   { value: 'Asia/Tokyo', label: 'Asia/Tokyo (UTC+9)' },
   { value: 'Asia/Seoul', label: 'Asia/Seoul (UTC+9)' },
@@ -53,19 +53,16 @@ const TIMEZONE_OPTIONS = [
   { value: 'Asia/Hong_Kong', label: 'Asia/Hong_Kong (UTC+8)' },
   { value: 'Asia/Dubai', label: 'Asia/Dubai (UTC+4)' },
   { value: 'Asia/Kolkata', label: 'Asia/Kolkata (UTC+5:30)' },
-  // 美洲
   { value: 'America/New_York', label: 'America/New_York (UTC-5)' },
   { value: 'America/Los_Angeles', label: 'America/Los_Angeles (UTC-8)' },
   { value: 'America/Chicago', label: 'America/Chicago (UTC-6)' },
   { value: 'America/Denver', label: 'America/Denver (UTC-7)' },
   { value: 'America/Toronto', label: 'America/Toronto (UTC-5)' },
   { value: 'America/Sao_Paulo', label: 'America/Sao_Paulo (UTC-3)' },
-  // 欧洲
   { value: 'Europe/London', label: 'Europe/London (UTC+0)' },
   { value: 'Europe/Paris', label: 'Europe/Paris (UTC+1)' },
   { value: 'Europe/Berlin', label: 'Europe/Berlin (UTC+1)' },
   { value: 'Europe/Moscow', label: 'Europe/Moscow (UTC+3)' },
-  // 大洋洲
   { value: 'Australia/Sydney', label: 'Australia/Sydney (UTC+10)' },
   { value: 'Pacific/Auckland', label: 'Pacific/Auckland (UTC+12)' },
 ]
@@ -76,55 +73,8 @@ const RESOLUTION_OPTIONS = [
   { value: 'custom', label: '自定义...' },
 ]
 
-const WEBGL_VENDOR_OPTIONS = [
-  { value: '', label: '不设置' },
-  { value: 'Intel', label: 'Intel' },
-  { value: 'NVIDIA', label: 'NVIDIA' },
-  { value: 'AMD', label: 'AMD' },
-  { value: 'Apple', label: 'Apple' },
-]
-
-const WEBGL_RENDERER_OPTIONS: Record<string, { value: string; label: string }[]> = {
-  Intel: [
-    { value: '', label: '不设置' },
-    { value: 'Intel(R) UHD Graphics 630', label: 'UHD Graphics 630' },
-    { value: 'Intel(R) UHD Graphics 620', label: 'UHD Graphics 620' },
-    { value: 'Intel(R) HD Graphics 520', label: 'HD Graphics 520' },
-    { value: 'Intel(R) Iris(R) Xe Graphics', label: 'Iris Xe Graphics' },
-    { value: 'custom', label: '自定义...' },
-  ],
-  NVIDIA: [
-    { value: '', label: '不设置' },
-    { value: 'NVIDIA GeForce RTX 3080', label: 'GeForce RTX 3080' },
-    { value: 'NVIDIA GeForce RTX 3060', label: 'GeForce RTX 3060' },
-    { value: 'NVIDIA GeForce GTX 1660', label: 'GeForce GTX 1660' },
-    { value: 'NVIDIA GeForce GTX 1080 Ti', label: 'GeForce GTX 1080 Ti' },
-    { value: 'custom', label: '自定义...' },
-  ],
-  AMD: [
-    { value: '', label: '不设置' },
-    { value: 'AMD Radeon RX 6600', label: 'Radeon RX 6600' },
-    { value: 'AMD Radeon RX 580', label: 'Radeon RX 580' },
-    { value: 'AMD Radeon Vega 8', label: 'Radeon Vega 8' },
-    { value: 'custom', label: '自定义...' },
-  ],
-  Apple: [
-    { value: '', label: '不设置' },
-    { value: 'Apple M1', label: 'Apple M1' },
-    { value: 'Apple M2', label: 'Apple M2' },
-    { value: 'Apple M3', label: 'Apple M3' },
-    { value: 'custom', label: '自定义...' },
-  ],
-}
-
-const BOOL_OPTIONS = [
-  { value: '', label: '不设置' },
-  { value: 'true', label: '启用' },
-  { value: 'false', label: '禁用' },
-]
-
 const HARDWARE_CONCURRENCY_OPTIONS = [
-  { value: '', label: '不设置' },
+  { value: '', label: '不设置（由种子随机）' },
   { value: '2', label: '2 核' },
   { value: '4', label: '4 核' },
   { value: '6', label: '6 核' },
@@ -134,46 +84,51 @@ const HARDWARE_CONCURRENCY_OPTIONS = [
   { value: '16', label: '16 核' },
 ]
 
-const DEVICE_MEMORY_OPTIONS = [
-  { value: '', label: '不设置' },
-  { value: '2', label: '2 GB' },
-  { value: '4', label: '4 GB' },
-  { value: '8', label: '8 GB' },
-  { value: '16', label: '16 GB' },
-  { value: '32', label: '32 GB' },
-]
-
-const COLOR_DEPTH_OPTIONS = [
-  { value: '', label: '不设置' },
-  { value: '24', label: '24 位（标准）' },
-  { value: '30', label: '30 位（HDR）' },
-  { value: '32', label: '32 位' },
-]
-
-const WEBRTC_OPTIONS = [
-  { value: '', label: '不设置' },
-  { value: 'disable_non_proxied_udp', label: '禁用非代理 UDP（推荐）' },
-  { value: 'default_public_interface_only', label: '仅公网接口' },
-  { value: 'default_public_and_private_interfaces', label: '公网+私网接口' },
-]
-
-const TOUCH_POINTS_OPTIONS = [
-  { value: '', label: '不设置' },
-  { value: '0', label: '0（无触摸）' },
-  { value: '1', label: '1 点触摸' },
-  { value: '5', label: '5 点触摸' },
-  { value: '10', label: '10 点触摸' },
-]
-
 const PRESET_OPTIONS = [
   { value: '', label: '选择预设...' },
   ...FINGERPRINT_PRESETS.map(p => ({ value: p.id, label: p.name })),
 ]
 
+/** 伪装项开关 */
+function SpoofToggle({ label, description, value, onChange }: {
+  label: string
+  description: string
+  value: boolean
+  onChange: (v: boolean) => void
+}) {
+  return (
+    <div className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-[var(--color-bg-hover)] transition-colors">
+      <div className="min-w-0">
+        <span className="text-sm font-medium text-[var(--color-text-primary)]">{label}</span>
+        <p className="text-xs text-[var(--color-text-muted)] mt-0.5">{description}</p>
+      </div>
+      <div className="flex gap-1.5 shrink-0 ml-4">
+        <button
+          type="button"
+          onClick={() => onChange(true)}
+          className={`px-3 py-1 text-xs rounded-md border transition-colors ${
+            value
+              ? 'bg-green-50 border-green-300 text-green-700 font-medium'
+              : 'bg-[var(--color-bg-base)] border-[var(--color-border)] text-[var(--color-text-muted)]'
+          }`}
+        >随机</button>
+        <button
+          type="button"
+          onClick={() => onChange(false)}
+          className={`px-3 py-1 text-xs rounded-md border transition-colors ${
+            !value
+              ? 'bg-red-50 border-red-300 text-red-700 font-medium'
+              : 'bg-[var(--color-bg-base)] border-[var(--color-border)] text-[var(--color-text-muted)]'
+          }`}
+        >关闭</button>
+      </div>
+    </div>
+  )
+}
+
 export function FingerprintPanel({ value, onChange }: FingerprintPanelProps) {
   const [config, setConfig] = useState<FingerprintConfig>(() => deserialize(value))
   const [advancedOpen, setAdvancedOpen] = useState(false)
-  const [, setCustomRenderer] = useState('')
   const [confirmSeedOpen, setConfirmSeedOpen] = useState(false)
 
   useEffect(() => {
@@ -190,7 +145,6 @@ export function FingerprintPanel({ value, onChange }: FingerprintPanelProps) {
     if (!presetId) return
     const preset = FINGERPRINT_PRESETS.find(p => p.id === presetId)
     if (!preset) return
-    // 应用预设时自动生成新种子，保留未知参数
     const next: FingerprintConfig = {
       ...preset.config,
       seed: randomFingerprintSeed(),
@@ -207,15 +161,10 @@ export function FingerprintPanel({ value, onChange }: FingerprintPanelProps) {
     onChange(serialize(parsed))
   }
 
-  const rendererOptions = config.webglVendor
-    ? (WEBGL_RENDERER_OPTIONS[config.webglVendor] ?? [{ value: '', label: '不设置' }, { value: 'custom', label: '自定义...' }])
-    : [{ value: '', label: '不设置' }]
-
-  const isCustomRenderer = config.webglRenderer
-    ? !rendererOptions.some(o => o.value === config.webglRenderer && o.value !== 'custom')
-    : false
-
   const advancedText = serialize(config).join('\n')
+  const warnings = useMemo(() => validateFingerprint(config), [config])
+  const warningCount = warnings.filter(w => w.level === 'warning').length
+  const infoCount = warnings.filter(w => w.level === 'info').length
 
   return (
     <div className="space-y-4">
@@ -223,7 +172,7 @@ export function FingerprintPanel({ value, onChange }: FingerprintPanelProps) {
       <div className="p-3 rounded-lg bg-[var(--color-bg-hover)] border border-[var(--color-border)] space-y-2">
         <div className="flex items-center justify-between">
           <span className="text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-wide">指纹种子（Fingerprint Seed）</span>
-          <span className="text-xs text-[var(--color-text-muted)]">决定所有随机噪声的根值，不同种子 = 不同指纹</span>
+          <span className="text-xs text-[var(--color-text-muted)]">设置后自动开启 Canvas/Audio/Font/GPU/ClientRects 全伪装</span>
         </div>
         <div className="flex items-center gap-2">
           <Input
@@ -255,7 +204,7 @@ export function FingerprintPanel({ value, onChange }: FingerprintPanelProps) {
         onClose={() => setConfirmSeedOpen(false)}
         onConfirm={() => update({ seed: randomFingerprintSeed() })}
         title="重新生成指纹种子"
-        content="重新生成后，当前指纹将完全改变，浏览器的 Canvas、WebGL、Audio 等所有噪声特征都会随之变化。确定继续？"
+        content="重新生成后，当前指纹将完全改变。确定继续？"
         confirmText="确定重新生成"
         danger
       />
@@ -280,11 +229,20 @@ export function FingerprintPanel({ value, onChange }: FingerprintPanelProps) {
           <FormItem label="浏览器品牌">
             <Select value={config.brand ?? ''} onChange={e => update({ brand: e.target.value || undefined })} options={BRAND_OPTIONS} />
           </FormItem>
+          <FormItem label="品牌版本">
+            <Input value={config.brandVersion ?? ''} onChange={e => update({ brandVersion: e.target.value || undefined })} placeholder="留空使用默认版本" />
+          </FormItem>
           <FormItem label="操作系统">
             <Select value={config.platform ?? ''} onChange={e => update({ platform: e.target.value || undefined })} options={PLATFORM_OPTIONS} />
           </FormItem>
+          <FormItem label="系统版本">
+            <Input value={config.platformVersion ?? ''} onChange={e => update({ platformVersion: e.target.value || undefined })} placeholder="留空使用默认版本" />
+          </FormItem>
           <FormItem label="语言">
             <Select value={config.lang ?? ''} onChange={e => update({ lang: e.target.value || undefined })} options={LANG_OPTIONS} />
+          </FormItem>
+          <FormItem label="Accept-Language">
+            <Input value={config.acceptLang ?? ''} onChange={e => update({ acceptLang: e.target.value || undefined })} placeholder="zh-CN,en-US" />
           </FormItem>
           <FormItem label="时区">
             <Select value={config.timezone ?? ''} onChange={e => update({ timezone: e.target.value || undefined })} options={TIMEZONE_OPTIONS.map(opt =>
@@ -296,10 +254,13 @@ export function FingerprintPanel({ value, onChange }: FingerprintPanelProps) {
         </div>
       </div>
 
-      {/* 屏幕与硬件 */}
+      {/* 硬件与窗口 */}
       <div>
-        <p className="text-xs font-medium text-[var(--color-text-muted)] mb-2 uppercase tracking-wide">屏幕与硬件</p>
+        <p className="text-xs font-medium text-[var(--color-text-muted)] mb-2 uppercase tracking-wide">硬件与窗口</p>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <FormItem label="CPU 核心数">
+            <Select value={config.hardwareConcurrency ?? ''} onChange={e => update({ hardwareConcurrency: e.target.value || undefined })} options={HARDWARE_CONCURRENCY_OPTIONS} />
+          </FormItem>
           <FormItem label="分辨率">
             <Select
               value={config.resolution ?? ''}
@@ -312,106 +273,81 @@ export function FingerprintPanel({ value, onChange }: FingerprintPanelProps) {
               <Input value={config.customResolution ?? ''} onChange={e => update({ customResolution: e.target.value || undefined })} placeholder="1600,900" />
             </FormItem>
           )}
-          <FormItem label="色深">
-            <Select value={config.colorDepth ?? ''} onChange={e => update({ colorDepth: e.target.value || undefined })} options={COLOR_DEPTH_OPTIONS} />
-          </FormItem>
-          <FormItem label="CPU 核心数">
-            <Select value={config.hardwareConcurrency ?? ''} onChange={e => update({ hardwareConcurrency: e.target.value || undefined })} options={HARDWARE_CONCURRENCY_OPTIONS} />
-          </FormItem>
-          <FormItem label="设备内存">
-            <Select value={config.deviceMemory ?? ''} onChange={e => update({ deviceMemory: e.target.value || undefined })} options={DEVICE_MEMORY_OPTIONS} />
-          </FormItem>
-          <FormItem label="触摸点数">
-            <Select value={config.touchPoints ?? ''} onChange={e => update({ touchPoints: e.target.value || undefined })} options={TOUCH_POINTS_OPTIONS} />
-          </FormItem>
         </div>
       </div>
 
-      {/* 渲染指纹 */}
+      {/* 指纹伪装开关（Chrome 144 核心功能） */}
       <div>
-        <p className="text-xs font-medium text-[var(--color-text-muted)] mb-2 uppercase tracking-wide">渲染指纹</p>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <FormItem label="WebGL 供应商">
-            <Select
-              value={config.webglVendor ?? ''}
-              onChange={e => update({ webglVendor: e.target.value || undefined, webglRenderer: undefined })}
-              options={WEBGL_VENDOR_OPTIONS}
-            />
-          </FormItem>
-          <FormItem label="WebGL 渲染器">
-            {isCustomRenderer ? (
-              <Input
-                value={config.webglRenderer ?? ''}
-                onChange={e => update({ webglRenderer: e.target.value || undefined })}
-                placeholder="自定义渲染器名称"
-              />
-            ) : (
-              <Select
-                value={config.webglRenderer ?? ''}
-                onChange={e => {
-                  if (e.target.value === 'custom') {
-                    setCustomRenderer('')
-                    update({ webglRenderer: undefined })
-                  } else {
-                    update({ webglRenderer: e.target.value || undefined })
-                  }
-                }}
-                options={rendererOptions}
-                disabled={!config.webglVendor}
-              />
-            )}
-          </FormItem>
-          <FormItem label="Canvas 噪声">
-            <Select
-              value={config.canvasNoise === undefined ? '' : String(config.canvasNoise)}
-              onChange={e => { const v = e.target.value; update({ canvasNoise: v === '' ? undefined : v === 'true' }) }}
-              options={BOOL_OPTIONS}
-            />
-          </FormItem>
-          <FormItem label="Audio 噪声">
-            <Select
-              value={config.audioNoise === undefined ? '' : String(config.audioNoise)}
-              onChange={e => { const v = e.target.value; update({ audioNoise: v === '' ? undefined : v === 'true' }) }}
-              options={BOOL_OPTIONS}
-            />
-          </FormItem>
+        <div className="flex items-center gap-2 mb-2">
+          <p className="text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-wide">指纹伪装</p>
+          <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700">Chrome 144</span>
         </div>
-      </div>
-
-      {/* 网络与隐私 */}
-      <div>
-        <p className="text-xs font-medium text-[var(--color-text-muted)] mb-2 uppercase tracking-wide">网络与隐私</p>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <FormItem label="WebRTC 策略">
-            <Select value={config.webrtcPolicy ?? ''} onChange={e => update({ webrtcPolicy: e.target.value || undefined })} options={WEBRTC_OPTIONS} />
-          </FormItem>
-          <FormItem label="Do Not Track">
-            <Select
-              value={config.doNotTrack === undefined ? '' : String(config.doNotTrack)}
-              onChange={e => { const v = e.target.value; update({ doNotTrack: v === '' ? undefined : v === 'true' }) }}
-              options={BOOL_OPTIONS}
-            />
-          </FormItem>
-          <FormItem label="媒体设备 (摄像头,麦克风,扬声器)">
-            <Input
-              value={config.mediaDevices ?? ''}
-              onChange={e => update({ mediaDevices: e.target.value || undefined })}
-              placeholder="2,1,1"
-            />
-          </FormItem>
-        </div>
-      </div>
-
-      {/* 字体 */}
-      <div>
-        <p className="text-xs font-medium text-[var(--color-text-muted)] mb-2 uppercase tracking-wide">字体</p>
-        <FormItem label="字体列表">
-          <Input
-            value={config.fonts ?? ''}
-            onChange={e => update({ fonts: e.target.value || undefined })}
-            placeholder="Arial,Helvetica,Times New Roman（逗号分隔）"
+        <p className="text-xs text-[var(--color-text-muted)] mb-3">设置种子后以下伪装默认全部开启，可选择性关闭</p>
+        <div className="border border-[var(--color-border)] rounded-lg divide-y divide-[var(--color-border)]">
+          <SpoofToggle
+            label="Canvas"
+            description="Canvas 2D 渲染指纹随机化"
+            value={config.spoofCanvas !== false}
+            onChange={v => update({ spoofCanvas: v })}
           />
-        </FormItem>
+          <SpoofToggle
+            label="Audio"
+            description="AudioContext 指纹随机化"
+            value={config.spoofAudio !== false}
+            onChange={v => update({ spoofAudio: v })}
+          />
+          <SpoofToggle
+            label="字体"
+            description="字体指纹随机化"
+            value={config.spoofFont !== false}
+            onChange={v => update({ spoofFont: v })}
+          />
+          <SpoofToggle
+            label="ClientRects"
+            description="DOM 元素尺寸测量指纹随机化"
+            value={config.spoofClientRects !== false}
+            onChange={v => update({ spoofClientRects: v })}
+          />
+          <SpoofToggle
+            label="GPU"
+            description="WebGL / GPU 指纹随机化"
+            value={config.spoofGpu !== false}
+            onChange={v => update({ spoofGpu: v })}
+          />
+        </div>
+      </div>
+
+      {/* WebRTC */}
+      <div>
+        <p className="text-xs font-medium text-[var(--color-text-muted)] mb-2 uppercase tracking-wide">网络隐私</p>
+        <div className="border border-[var(--color-border)] rounded-lg">
+          <div className="flex items-center justify-between py-2 px-3">
+            <div>
+              <span className="text-sm font-medium text-[var(--color-text-primary)]">WebRTC 禁用非代理 UDP</span>
+              <p className="text-xs text-[var(--color-text-muted)] mt-0.5">防止 WebRTC 泄露真实 IP</p>
+            </div>
+            <div className="flex gap-1.5 shrink-0 ml-4">
+              <button
+                type="button"
+                onClick={() => update({ disableWebrtcUdp: true })}
+                className={`px-3 py-1 text-xs rounded-md border transition-colors ${
+                  config.disableWebrtcUdp
+                    ? 'bg-green-50 border-green-300 text-green-700 font-medium'
+                    : 'bg-[var(--color-bg-base)] border-[var(--color-border)] text-[var(--color-text-muted)]'
+                }`}
+              >开启</button>
+              <button
+                type="button"
+                onClick={() => update({ disableWebrtcUdp: false })}
+                className={`px-3 py-1 text-xs rounded-md border transition-colors ${
+                  !config.disableWebrtcUdp
+                    ? 'bg-red-50 border-red-300 text-red-700 font-medium'
+                    : 'bg-[var(--color-bg-base)] border-[var(--color-border)] text-[var(--color-text-muted)]'
+                }`}
+              >关闭</button>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* 高级模式 */}
@@ -431,11 +367,48 @@ export function FingerprintPanel({ value, onChange }: FingerprintPanelProps) {
               value={advancedText}
               onChange={e => handleAdvancedChange(e.target.value)}
               rows={6}
-              placeholder="--fingerprint-brand=Chrome"
+              placeholder="--fingerprint=12345"
             />
           </div>
         )}
       </div>
+
+      {/* 指纹校验结果 */}
+      {warnings.length > 0 && (
+        <div className="border border-[var(--color-border)] rounded-lg overflow-hidden">
+          <div className="flex items-center gap-2 px-4 py-2.5 bg-[var(--color-bg-hover)]">
+            {warningCount > 0 && (
+              <span className="flex items-center gap-1 text-xs text-amber-600">
+                <AlertTriangle className="w-3.5 h-3.5" />
+                {warningCount} 个警告
+              </span>
+            )}
+            {infoCount > 0 && (
+              <span className="flex items-center gap-1 text-xs text-blue-500">
+                <Info className="w-3.5 h-3.5" />
+                {infoCount} 个建议
+              </span>
+            )}
+          </div>
+          <div className="px-4 py-2 space-y-1.5">
+            {warnings.map((w, i) => (
+              <div
+                key={i}
+                className={`flex items-start gap-2 text-xs py-1 ${
+                  w.level === 'warning' ? 'text-amber-700' : 'text-blue-600'
+                }`}
+              >
+                {w.level === 'warning' ? (
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                ) : (
+                  <Info className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                )}
+                <span>{w.message}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

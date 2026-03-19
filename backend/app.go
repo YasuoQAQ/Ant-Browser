@@ -33,8 +33,10 @@ type App struct {
 	xrayMgr        *proxy.XrayManager
 	clashMgr       *proxy.ClashManager
 	singboxMgr     *proxy.SingBoxManager
+	ipfoxyMgr      *proxy.IPFoxyBridgeManager
 	launchCodeSvc  *launchcode.LaunchCodeService
 	launchServer   *launchcode.LaunchServer
+	apiServer      *launchcode.APIServer
 	speedScheduler *browser.ProxySpeedScheduler
 	appRoot        string
 
@@ -122,6 +124,14 @@ func (a *App) startup(ctx context.Context) {
 	a.clashMgr = proxy.NewClashManager(cfg, a.appRoot)
 	a.singboxMgr = proxy.NewSingBoxManager(cfg, a.appRoot)
 
+	// 初始化 IPFoxy 桥接管理器
+	v2rayURL := strings.TrimSpace(cfg.IPFoxy.V2RayURL)
+	if v2rayURL == "" {
+		v2rayURL = config.DefaultConfig().IPFoxy.V2RayURL
+	}
+	binDir := filepath.Join(a.appRoot, "bin")
+	a.ipfoxyMgr = proxy.NewIPFoxyBridgeManager(binDir, v2rayURL)
+
 	// 注入 DAO（必须在 InitData 之前）
 	conn := db.GetConn()
 	a.browserMgr.ProfileDAO = browser.NewSQLiteProfileDAO(conn)
@@ -154,6 +164,18 @@ func (a *App) startup(ctx context.Context) {
 		log.Info("LaunchServer 监听地址",
 			logger.F("url", fmt.Sprintf("http://127.0.0.1:%d", a.launchServer.Port())),
 			logger.F("preferred_port", port),
+		)
+	}
+
+	// 启动 API Server（完整 REST API）
+	apiPort := a.config.APIServer.Port
+	a.apiServer = launchcode.NewAPIServer(a.launchServer, a, a, a.browserMgr, a, apiPort)
+	if err := a.apiServer.Start(); err != nil {
+		log.Error("API Server 启动失败", logger.F("error", err))
+	} else {
+		log.Info("API Server 监听地址",
+			logger.F("url", fmt.Sprintf("http://127.0.0.1:%d", a.apiServer.Port())),
+			logger.F("preferred_port", apiPort),
 		)
 	}
 
@@ -204,8 +226,12 @@ func (a *App) ReloadConfig() error {
 	if a.clashMgr != nil {
 		a.clashMgr.Config = cfg
 	}
-	if a.singboxMgr != nil {
-		a.singboxMgr.Config = cfg
+	if a.ipfoxyMgr != nil {
+		v2rayURL := strings.TrimSpace(cfg.IPFoxy.V2RayURL)
+		if v2rayURL == "" {
+			v2rayURL = config.DefaultConfig().IPFoxy.V2RayURL
+		}
+		a.ipfoxyMgr.SetV2RayURL(v2rayURL)
 	}
 
 	log.Info("前端触发配置重载成功")

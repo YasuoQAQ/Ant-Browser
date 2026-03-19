@@ -8,19 +8,88 @@ import (
 	"sync"
 )
 
+// FingerprintConfig 结构化指纹配置（与前端 FingerprintConfig 完全对齐）
+type FingerprintConfig struct {
+	Seed                string   `json:"seed,omitempty"`
+	Brand               string   `json:"brand,omitempty"`
+	BrandVersion        string   `json:"brandVersion,omitempty"`
+	Platform            string   `json:"platform,omitempty"`
+	PlatformVersion     string   `json:"platformVersion,omitempty"`
+	Lang                string   `json:"lang,omitempty"`
+	AcceptLang          string   `json:"acceptLang,omitempty"`
+	Timezone            string   `json:"timezone,omitempty"`
+	Resolution          string   `json:"resolution,omitempty"`
+	CustomResolution    string   `json:"customResolution,omitempty"`
+	HardwareConcurrency string   `json:"hardwareConcurrency,omitempty"`
+	DisableWebrtcUDP    bool     `json:"disableWebrtcUdp,omitempty"`
+	SpoofCanvas         *bool    `json:"spoofCanvas,omitempty"`
+	SpoofAudio          *bool    `json:"spoofAudio,omitempty"`
+	SpoofFont           *bool    `json:"spoofFont,omitempty"`
+	SpoofClientRects    *bool    `json:"spoofClientRects,omitempty"`
+	SpoofGPU            *bool    `json:"spoofGpu,omitempty"`
+	UnknownArgs         []string `json:"unknownArgs,omitempty"`
+}
+
+// ProfilePreferences 浏览器偏好设置（启动前行为与安全检查）
+type ProfilePreferences struct {
+	// 显示
+	ShowWindowName bool `json:"showWindowName"`
+	// 书签
+	CustomBookmarks bool `json:"customBookmarks"`
+	// 同步选项
+	SyncBookmarks      bool `json:"syncBookmarks"`
+	SyncHistory        bool `json:"syncHistory"`
+	SyncTabs           bool `json:"syncTabs"`
+	SyncCookies        bool `json:"syncCookies"`
+	SyncExtensions     bool `json:"syncExtensions"`
+	SyncPasswords      bool `json:"syncPasswords"`
+	SyncIndexedDB      bool `json:"syncIndexedDB"`
+	SyncLocalStorage   bool `json:"syncLocalStorage"`
+	SyncSessionStorage bool `json:"syncSessionStorage"`
+	// 启动前清理
+	ClearCacheOnStart        bool `json:"clearCacheOnStart"`
+	ClearCookiesOnStart      bool `json:"clearCookiesOnStart"`
+	ClearLocalStorageOnStart bool `json:"clearLocalStorageOnStart"`
+	// 指纹行为
+	RandomFingerprintOnStart bool `json:"randomFingerprintOnStart"`
+	// 浏览器行为
+	DisablePasswordPrompt bool `json:"disablePasswordPrompt"`
+	// 安全检查
+	StopOnNetworkFail bool `json:"stopOnNetworkFail"`
+	StopOnIPChange    bool `json:"stopOnIPChange"`
+}
+
+// RuntimeSummary 最近一次启动/运行摘要
+// 说明：保留顶层字段用于兼容，新的读取方应优先使用 Runtime。
+type RuntimeSummary struct {
+	EffectiveProxy      string   `json:"effectiveProxy,omitempty"`
+	RequestedLaunchArgs []string `json:"requestedLaunchArgs,omitempty"`
+	RequestedStartUrls  []string `json:"requestedStartUrls,omitempty"`
+	WSEndpoint          string   `json:"wsEndpoint,omitempty"`
+	ResetUserData       bool     `json:"resetUserData,omitempty"`
+	LastStartAt         string   `json:"lastStartAt,omitempty"`
+	LastStopAt          string   `json:"lastStopAt,omitempty"`
+	LastError           string   `json:"lastError,omitempty"`
+	DebugPort           int      `json:"debugPort,omitempty"`
+	Pid                 int      `json:"pid,omitempty"`
+	Running             bool     `json:"running"`
+}
+
 // Profile 浏览器配置文件
 type Profile struct {
-	ProfileId       string   `json:"profileId"`
-	ProfileName     string   `json:"profileName"`
-	UserDataDir     string   `json:"userDataDir"`
-	CoreId          string   `json:"coreId"`
-	FingerprintArgs []string `json:"fingerprintArgs"`
-	ProxyId         string   `json:"proxyId"`
+	ProfileId         string             `json:"profileId"`
+	ProfileName       string             `json:"profileName"`
+	UserDataDir       string             `json:"userDataDir"`
+	CoreId            string             `json:"coreId"`
+	FingerprintArgs   []string           `json:"fingerprintArgs"`
+	FingerprintConfig *FingerprintConfig `json:"fingerprintConfig,omitempty"`
+	ProxyId           string             `json:"proxyId"`
 	ProxyConfig     string   `json:"proxyConfig"`
 	LaunchArgs      []string `json:"launchArgs"`
 	Tags            []string `json:"tags"`
 	Keywords        []string `json:"keywords"`
 	GroupId         string   `json:"groupId"` // 所属分组ID
+	Preferences     *ProfilePreferences `json:"preferences,omitempty"`
 	LaunchCode      string   `json:"launchCode"`
 	Running         bool     `json:"running"`
 	DebugPort       int      `json:"debugPort"`
@@ -30,6 +99,12 @@ type Profile struct {
 	UpdatedAt       string   `json:"updatedAt"`
 	LastStartAt     string   `json:"lastStartAt"`
 	LastStopAt      string   `json:"lastStopAt"`
+	Runtime         RuntimeSummary `json:"runtime,omitempty"`
+	EffectiveProxy      string   `json:"effectiveProxy,omitempty"`
+	RequestedLaunchArgs []string `json:"requestedLaunchArgs,omitempty"`
+	RequestedStartUrls  []string `json:"requestedStartUrls,omitempty"`
+	WSEndpoint          string   `json:"wsEndpoint,omitempty"`
+	ResetUserData       bool     `json:"resetUserData,omitempty"`
 }
 
 // ProfileInput 创建/更新配置文件的输入
@@ -44,6 +119,7 @@ type ProfileInput struct {
 	Tags            []string `json:"tags"`
 	Keywords        []string `json:"keywords"`
 	GroupId         string   `json:"groupId"` // 所属分组ID
+	Preferences     *ProfilePreferences `json:"preferences,omitempty"`
 }
 
 // Tab 浏览器标签页

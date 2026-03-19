@@ -192,8 +192,8 @@ export function DashboardPage() {
             </div>
             <p className="mt-2 text-xs text-[var(--color-text-muted)] flex items-center justify-between">
               <span>当前容量限制：</span>
-              <span className={`font-medium ${stats.totalInstances >= stats.maxProfileLimit ? 'text-red-500' : 'text-[var(--color-success)]'}`}>
-                {loading ? '-' : `${stats.totalInstances} / ${stats.maxProfileLimit}`}
+              <span className={`font-medium text-[var(--color-success)]`}>
+                {loading ? '-' : `${stats.totalInstances} / ∞`}
               </span>
             </p>
           </div>

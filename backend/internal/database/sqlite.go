@@ -133,6 +133,20 @@ var migrations = []migration{
 	//         `ALTER TABLE xxx ADD COLUMN yyy TEXT NOT NULL DEFAULT ''`,
 	//     },
 	// },
+	{
+		version: 6,
+		desc:    "添加结构化指纹配置列",
+		stmts: []string{
+			`ALTER TABLE browser_profiles ADD COLUMN fingerprint_config TEXT NOT NULL DEFAULT '{}'`,
+		},
+	},
+	{
+		version: 7,
+		desc:    "添加偏好设置列",
+		stmts: []string{
+			`ALTER TABLE browser_profiles ADD COLUMN preferences TEXT NOT NULL DEFAULT '{}'`,
+		},
+	},
 }
 
 // NewDB 创建新的数据库连接

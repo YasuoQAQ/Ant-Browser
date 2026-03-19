@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { FolderOpen, Layers } from 'lucide-react'
+import { ChevronDown, ChevronUp, FolderOpen, Layers } from 'lucide-react'
 import { Button, Card, ConfirmModal, FormItem, Input, Modal, Select, Textarea, toast } from '../../../shared/components'
 import type { BrowserCore, BrowserProfileInput, BrowserProxy, BrowserGroup } from '../types'
 import { createBrowserProfile, fetchAllTags, fetchBrowserCores, fetchBrowserProfiles, fetchBrowserProxies, fetchGroups, openUserDataDir, updateBrowserProfile } from '../api'
 import { FingerprintPanel } from '../components/FingerprintPanel'
+import { PreferencesPanel } from '../components/PreferencesPanel'
+import { generateDefaultFingerprint } from '../utils/fingerprintSerializer'
 import { TagInput } from '../components/TagInput'
 import { GroupSelector } from '../components/GroupSelector'
 import { ProxyPickerModal } from '../components/ProxyPickerModal'
@@ -17,13 +19,33 @@ export function BrowserEditPage() {
     profileName: '',
     userDataDir: '',
     coreId: '',
-    fingerprintArgs: [],
+    fingerprintArgs: isCreate ? generateDefaultFingerprint() : [],
     proxyId: '',
     proxyConfig: '',
     launchArgs: [],
     tags: [],
     keywords: [],
     groupId: '',
+    preferences: {
+      showWindowName: false,
+      customBookmarks: false,
+      syncBookmarks: false,
+      syncHistory: false,
+      syncTabs: true,
+      syncCookies: true,
+      syncExtensions: false,
+      syncPasswords: true,
+      syncIndexedDB: true,
+      syncLocalStorage: true,
+      syncSessionStorage: false,
+      clearCacheOnStart: false,
+      clearCookiesOnStart: false,
+      clearLocalStorageOnStart: false,
+      randomFingerprintOnStart: false,
+      disablePasswordPrompt: false,
+      stopOnNetworkFail: false,
+      stopOnIPChange: false,
+    },
   })
   const [cores, setCores] = useState<BrowserCore[]>([])
   const [proxies, setProxies] = useState<BrowserProxy[]>([])
@@ -35,6 +57,8 @@ export function BrowserEditPage() {
   const [isDirty, setIsDirty] = useState(false)
   const [leaveConfirm, setLeaveConfirm] = useState(false)
   const [saveError, setSaveError] = useState('')
+  const [fingerprintOpen, setFingerprintOpen] = useState(true)
+  const [preferencesOpen, setPreferencesOpen] = useState(false)
 
   useEffect(() => {
     const loadData = async () => {
@@ -64,6 +88,7 @@ export function BrowserEditPage() {
         tags: current.tags,
         keywords: current.keywords || [],
         groupId: current.groupId || '',
+        preferences: current.preferences || { disablePasswordPrompt: true, syncBookmarks: true, syncHistory: true, syncTabs: true, syncCookies: true, syncExtensions: true, syncPasswords: true, syncIndexedDB: true, syncLocalStorage: true, syncSessionStorage: true, showWindowName: true, customBookmarks: true },
       })
       setLaunchArgsText(current.launchArgs.join('\n'))
     }
@@ -221,10 +246,37 @@ export function BrowserEditPage() {
       />
 
       <Card title="指纹配置" subtitle="配置浏览器指纹参数">
-        <FingerprintPanel
-          value={formData.fingerprintArgs}
-          onChange={args => handleChange('fingerprintArgs', args)}
-        />
+        <button
+          type="button"
+          className="mb-3 w-full flex items-center justify-between rounded-lg border border-[var(--color-border)] px-3 py-2 text-sm text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-hover)] transition-colors"
+          onClick={() => setFingerprintOpen(v => !v)}
+        >
+          <span>{fingerprintOpen ? '收起指纹配置' : '展开指纹配置'}</span>
+          {fingerprintOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+        </button>
+        {fingerprintOpen && (
+          <FingerprintPanel
+            value={formData.fingerprintArgs}
+            onChange={args => handleChange('fingerprintArgs', args)}
+          />
+        )}
+      </Card>
+
+      <Card title="偏好设置" subtitle="启动前行为、安全检查">
+        <button
+          type="button"
+          className="mb-3 w-full flex items-center justify-between rounded-lg border border-[var(--color-border)] px-3 py-2 text-sm text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-hover)] transition-colors"
+          onClick={() => setPreferencesOpen(v => !v)}
+        >
+          <span>{preferencesOpen ? '收起偏好设置' : '展开偏好设置'}</span>
+          {preferencesOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+        </button>
+        {preferencesOpen && (
+          <PreferencesPanel
+            value={formData.preferences || {}}
+            onChange={prefs => { setIsDirty(true); setFormData(prev => ({ ...prev, preferences: prefs })) }}
+          />
+        )}
       </Card>
 
       <Card title="启动参数" subtitle="每行一个参数">

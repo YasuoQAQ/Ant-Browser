@@ -115,9 +115,15 @@ export function BrowserSnapshotRestore(arg1:string,arg2:string):Promise<void>;
 
 export function ClearAppLogs():Promise<void>;
 
+export function ClearCookies(arg1:string):Promise<void>;
+
 export function CreateGroup(arg1:browser.GroupInput):Promise<browser.Group>;
 
+export function CreateProfile(arg1:browser.ProfileInput):Promise<browser.Profile>;
+
 export function DeleteGroup(arg1:string):Promise<void>;
+
+export function DeleteProfile(arg1:string):Promise<void>;
 
 export function FetchRemoteAuthorProfile(arg1:string,arg2:number):Promise<Record<string, any>>;
 
@@ -125,11 +131,15 @@ export function ForceQuit():Promise<void>;
 
 export function GenerateCDKeys(arg1:number):Promise<Array<string>>;
 
+export function GetAPIServerInfo():Promise<Record<string, any>>;
+
 export function GetAppConfig():Promise<Record<string, any>>;
 
 export function GetAppLogs():Promise<Array<logger.MemoryLogEntry>>;
 
 export function GetBrowserSettings():Promise<browser.Settings>;
+
+export function GetCookies(arg1:string,arg2:Array<string>):Promise<Array<Record<string, any>>>;
 
 export function GetDashboardStats():Promise<Record<string, any>>;
 
@@ -143,9 +153,13 @@ export function GetLogLevel():Promise<string>;
 
 export function GetMemoryStats():Promise<Record<string, any>>;
 
+export function GetProfile(arg1:string):Promise<browser.Profile>;
+
 export function GetRunningInstances():Promise<Array<browser.Profile>>;
 
 export function ListGroups():Promise<Array<browser.GroupWithCount>>;
+
+export function ListProfiles():Promise<Array<browser.Profile>>;
 
 export function MoveInstancesToGroup(arg1:Array<string>,arg2:string):Promise<void>;
 
@@ -163,11 +177,15 @@ export function SaveBrowserProxies(arg1:Array<config.BrowserProxy>):Promise<void
 
 export function SaveBrowserSettings(arg1:browser.Settings):Promise<void>;
 
+export function SetCookies(arg1:string,arg2:Array<Record<string, any>>):Promise<void>;
+
 export function SetLogLevel(arg1:string):Promise<void>;
 
 export function StartInstance(arg1:string):Promise<browser.Profile>;
 
 export function StartInstanceWithParams(arg1:string,arg2:launchcode.LaunchRequestParams):Promise<browser.Profile>;
+
+export function StopInstance(arg1:string):Promise<browser.Profile>;
 
 export function TestProxyConnectivity(arg1:string,arg2:string):Promise<backend.ProxyTestResult>;
 
@@ -176,5 +194,7 @@ export function TestProxyRealConnectivity(arg1:string):Promise<backend.ProxyTest
 export function TriggerGC():Promise<void>;
 
 export function UpdateGroup(arg1:string,arg2:browser.GroupInput):Promise<browser.Group>;
+
+export function UpdateProfile(arg1:string,arg2:browser.ProfileInput):Promise<browser.Profile>;
 
 export function ValidateProxyConfig(arg1:string,arg2:string):Promise<backend.ProxyValidationResult>;

@@ -22,15 +22,11 @@ func (a *App) GetLicenseStatus() LicenseStatus {
 	if a.browserMgr != nil {
 		profilesCount = len(a.browserMgr.List())
 	}
-	usedKeys := a.config.App.UsedCDKeys
-	if usedKeys == nil {
-		usedKeys = []string{}
-	}
 
 	return LicenseStatus{
-		MaxLimit:  a.config.App.MaxProfileLimit,
+		MaxLimit:  0, // 0 = 无限制
 		UsedCount: profilesCount,
-		UsedKeys:  usedKeys,
+		UsedKeys:  []string{},
 	}
 }
 

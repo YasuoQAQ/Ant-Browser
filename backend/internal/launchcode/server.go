@@ -26,6 +26,7 @@ type LaunchRequestParams struct {
 	LaunchArgs           []string `json:"launchArgs"`
 	StartURLs            []string `json:"startUrls"`
 	SkipDefaultStartURLs bool     `json:"skipDefaultStartUrls"`
+	ResetUserData        bool     `json:"resetUserData"`
 }
 
 // LaunchRequest POST /api/launch 的请求体
@@ -37,6 +38,11 @@ type LaunchRequest struct {
 // BrowserStarterWithParams 可选接口：支持带参数启动实例
 type BrowserStarterWithParams interface {
 	StartInstanceWithParams(profileId string, params LaunchRequestParams) (*browser.Profile, error)
+}
+
+// BrowserStopper 可选接口：支持停止实例
+type BrowserStopper interface {
+	StopInstance(profileId string) (*browser.Profile, error)
 }
 
 // LaunchCallRecord 接口调用记录

@@ -668,6 +668,26 @@ export async function fetchLaunchServerInfo(): Promise<LaunchServerInfo> {
   }
 }
 
+export async function fetchAPIServerInfo(): Promise<LaunchServerInfo> {
+  const bindings: any = await getBindings()
+  if (bindings?.GetAPIServerInfo) {
+    return normalizeLaunchServerInfo(await bindings.GetAPIServerInfo())
+  }
+
+  const goApp = (window as any).go?.main?.App
+  if (goApp?.GetAPIServerInfo) {
+    return normalizeLaunchServerInfo(await goApp.GetAPIServerInfo())
+  }
+
+  return {
+    host: '127.0.0.1',
+    port: 49999,
+    preferredPort: 49999,
+    baseUrl: 'http://127.0.0.1:49999',
+    ready: false,
+  }
+}
+
 export async function getBrowserProfileCode(profileId: string): Promise<string> {
   const bindings: any = await getBindings()
   if (bindings?.BrowserProfileGetCode) {

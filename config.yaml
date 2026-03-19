@@ -41,6 +41,13 @@ browser:
   default_fingerprint_args:
     - --fingerprint-brand=Chrome
     - --fingerprint-platform=windows
+    - --lang=zh-CN
+    - --fingerprint-canvas-noise=true
+    - --fingerprint-audio-noise=true
+    - --webrtc-ip-handling-policy=disable_non_proxied_udp
+    - --fingerprint-do-not-track=true
+    - --fingerprint-media-devices=1,1,1
+    - --fingerprint-touch-points=0
   default_launch_args:
     - --disable-sync
     - --no-first-run
@@ -50,4 +57,6 @@ browser:
   proxies: []
   profiles: []
 launch_server:
-  port: 0
+  port: 10003
+api_server:
+  port: 10004

@@ -330,6 +330,52 @@ export namespace browser {
 	        this.message = source["message"];
 	    }
 	}
+	export class FingerprintConfig {
+	    seed?: string;
+	    brand?: string;
+	    brandVersion?: string;
+	    platform?: string;
+	    platformVersion?: string;
+	    lang?: string;
+	    acceptLang?: string;
+	    timezone?: string;
+	    resolution?: string;
+	    customResolution?: string;
+	    hardwareConcurrency?: string;
+	    disableWebrtcUdp?: boolean;
+	    spoofCanvas?: boolean;
+	    spoofAudio?: boolean;
+	    spoofFont?: boolean;
+	    spoofClientRects?: boolean;
+	    spoofGpu?: boolean;
+	    unknownArgs?: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new FingerprintConfig(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.seed = source["seed"];
+	        this.brand = source["brand"];
+	        this.brandVersion = source["brandVersion"];
+	        this.platform = source["platform"];
+	        this.platformVersion = source["platformVersion"];
+	        this.lang = source["lang"];
+	        this.acceptLang = source["acceptLang"];
+	        this.timezone = source["timezone"];
+	        this.resolution = source["resolution"];
+	        this.customResolution = source["customResolution"];
+	        this.hardwareConcurrency = source["hardwareConcurrency"];
+	        this.disableWebrtcUdp = source["disableWebrtcUdp"];
+	        this.spoofCanvas = source["spoofCanvas"];
+	        this.spoofAudio = source["spoofAudio"];
+	        this.spoofFont = source["spoofFont"];
+	        this.spoofClientRects = source["spoofClientRects"];
+	        this.spoofGpu = source["spoofGpu"];
+	        this.unknownArgs = source["unknownArgs"];
+	    }
+	}
 	export class Group {
 	    groupId: string;
 	    groupName: string;
@@ -392,18 +438,98 @@ export namespace browser {
 	        this.instanceCount = source["instanceCount"];
 	    }
 	}
+	export class RuntimeSummary {
+	    effectiveProxy?: string;
+	    requestedLaunchArgs?: string[];
+	    requestedStartUrls?: string[];
+	    wsEndpoint?: string;
+	    resetUserData?: boolean;
+	    lastStartAt?: string;
+	    lastStopAt?: string;
+	    lastError?: string;
+	    debugPort?: number;
+	    pid?: number;
+	    running: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new RuntimeSummary(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.effectiveProxy = source["effectiveProxy"];
+	        this.requestedLaunchArgs = source["requestedLaunchArgs"];
+	        this.requestedStartUrls = source["requestedStartUrls"];
+	        this.wsEndpoint = source["wsEndpoint"];
+	        this.resetUserData = source["resetUserData"];
+	        this.lastStartAt = source["lastStartAt"];
+	        this.lastStopAt = source["lastStopAt"];
+	        this.lastError = source["lastError"];
+	        this.debugPort = source["debugPort"];
+	        this.pid = source["pid"];
+	        this.running = source["running"];
+	    }
+	}
+	export class ProfilePreferences {
+	    showWindowName: boolean;
+	    customBookmarks: boolean;
+	    syncBookmarks: boolean;
+	    syncHistory: boolean;
+	    syncTabs: boolean;
+	    syncCookies: boolean;
+	    syncExtensions: boolean;
+	    syncPasswords: boolean;
+	    syncIndexedDB: boolean;
+	    syncLocalStorage: boolean;
+	    syncSessionStorage: boolean;
+	    clearCacheOnStart: boolean;
+	    clearCookiesOnStart: boolean;
+	    clearLocalStorageOnStart: boolean;
+	    randomFingerprintOnStart: boolean;
+	    disablePasswordPrompt: boolean;
+	    stopOnNetworkFail: boolean;
+	    stopOnIPChange: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new ProfilePreferences(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.showWindowName = source["showWindowName"];
+	        this.customBookmarks = source["customBookmarks"];
+	        this.syncBookmarks = source["syncBookmarks"];
+	        this.syncHistory = source["syncHistory"];
+	        this.syncTabs = source["syncTabs"];
+	        this.syncCookies = source["syncCookies"];
+	        this.syncExtensions = source["syncExtensions"];
+	        this.syncPasswords = source["syncPasswords"];
+	        this.syncIndexedDB = source["syncIndexedDB"];
+	        this.syncLocalStorage = source["syncLocalStorage"];
+	        this.syncSessionStorage = source["syncSessionStorage"];
+	        this.clearCacheOnStart = source["clearCacheOnStart"];
+	        this.clearCookiesOnStart = source["clearCookiesOnStart"];
+	        this.clearLocalStorageOnStart = source["clearLocalStorageOnStart"];
+	        this.randomFingerprintOnStart = source["randomFingerprintOnStart"];
+	        this.disablePasswordPrompt = source["disablePasswordPrompt"];
+	        this.stopOnNetworkFail = source["stopOnNetworkFail"];
+	        this.stopOnIPChange = source["stopOnIPChange"];
+	    }
+	}
 	export class Profile {
 	    profileId: string;
 	    profileName: string;
 	    userDataDir: string;
 	    coreId: string;
 	    fingerprintArgs: string[];
+	    fingerprintConfig?: FingerprintConfig;
 	    proxyId: string;
 	    proxyConfig: string;
 	    launchArgs: string[];
 	    tags: string[];
 	    keywords: string[];
 	    groupId: string;
+	    preferences?: ProfilePreferences;
 	    launchCode: string;
 	    running: boolean;
 	    debugPort: number;
@@ -413,6 +539,12 @@ export namespace browser {
 	    updatedAt: string;
 	    lastStartAt: string;
 	    lastStopAt: string;
+	    runtime?: RuntimeSummary;
+	    effectiveProxy?: string;
+	    requestedLaunchArgs?: string[];
+	    requestedStartUrls?: string[];
+	    wsEndpoint?: string;
+	    resetUserData?: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new Profile(source);
@@ -425,12 +557,14 @@ export namespace browser {
 	        this.userDataDir = source["userDataDir"];
 	        this.coreId = source["coreId"];
 	        this.fingerprintArgs = source["fingerprintArgs"];
+	        this.fingerprintConfig = this.convertValues(source["fingerprintConfig"], FingerprintConfig);
 	        this.proxyId = source["proxyId"];
 	        this.proxyConfig = source["proxyConfig"];
 	        this.launchArgs = source["launchArgs"];
 	        this.tags = source["tags"];
 	        this.keywords = source["keywords"];
 	        this.groupId = source["groupId"];
+	        this.preferences = this.convertValues(source["preferences"], ProfilePreferences);
 	        this.launchCode = source["launchCode"];
 	        this.running = source["running"];
 	        this.debugPort = source["debugPort"];
@@ -440,7 +574,31 @@ export namespace browser {
 	        this.updatedAt = source["updatedAt"];
 	        this.lastStartAt = source["lastStartAt"];
 	        this.lastStopAt = source["lastStopAt"];
+	        this.runtime = this.convertValues(source["runtime"], RuntimeSummary);
+	        this.effectiveProxy = source["effectiveProxy"];
+	        this.requestedLaunchArgs = source["requestedLaunchArgs"];
+	        this.requestedStartUrls = source["requestedStartUrls"];
+	        this.wsEndpoint = source["wsEndpoint"];
+	        this.resetUserData = source["resetUserData"];
 	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class ProfileInput {
 	    profileName: string;
@@ -453,6 +611,7 @@ export namespace browser {
 	    tags: string[];
 	    keywords: string[];
 	    groupId: string;
+	    preferences?: ProfilePreferences;
 	
 	    static createFrom(source: any = {}) {
 	        return new ProfileInput(source);
@@ -470,8 +629,29 @@ export namespace browser {
 	        this.tags = source["tags"];
 	        this.keywords = source["keywords"];
 	        this.groupId = source["groupId"];
+	        this.preferences = this.convertValues(source["preferences"], ProfilePreferences);
 	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
+	
+	
 	export class Settings {
 	    userDataRoot: string;
 	    defaultFingerprintArgs: string[];
@@ -596,6 +776,7 @@ export namespace launchcode {
 	    launchArgs: string[];
 	    startUrls: string[];
 	    skipDefaultStartUrls: boolean;
+	    resetUserData: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new LaunchRequestParams(source);
@@ -606,6 +787,7 @@ export namespace launchcode {
 	        this.launchArgs = source["launchArgs"];
 	        this.startUrls = source["startUrls"];
 	        this.skipDefaultStartUrls = source["skipDefaultStartUrls"];
+	        this.resetUserData = source["resetUserData"];
 	    }
 	}
 

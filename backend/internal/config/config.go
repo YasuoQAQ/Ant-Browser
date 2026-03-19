@@ -15,6 +15,18 @@ type LaunchServerConfig struct {
 	Port int `yaml:"port"`
 }
 
+// APIServerConfig REST API 服务配置
+type APIServerConfig struct {
+	// Port <= 0 时自动分配随机可用端口。
+	Port int `yaml:"port"`
+}
+
+// IPFoxyConfig IPFoxy 桥接配置
+type IPFoxyConfig struct {
+	// 上游 V2Ray/SOCKS5 地址，例如 socks5://127.0.0.1:10808
+	V2RayURL string `yaml:"v2ray_url"`
+}
+
 // Config 应用配置
 type Config struct {
 	Database     DatabaseConfig     `yaml:"database"`
@@ -23,6 +35,8 @@ type Config struct {
 	Logging      LoggingConfig      `yaml:"logging"`
 	Browser      BrowserConfig      `yaml:"browser"`
 	LaunchServer LaunchServerConfig `yaml:"launch_server"`
+	APIServer    APIServerConfig    `yaml:"api_server"`
+	IPFoxy       IPFoxyConfig       `yaml:"ipfoxy"`
 }
 
 // DatabaseConfig 数据库配置
@@ -223,19 +237,9 @@ func normalizeConfig(config *Config) {
 		config.App.UsedCDKeys = []string{}
 	}
 
-	// 兼容老版本配置: 如果之前没有 max_profile_limit，它会被解析成 0，
-	// 若用户在 0 状态下兑换了额度（比如 0+3=3），基础的 3 额度会被覆盖。
-	// 这里通过统计兑换记录重新保底验证它的额度即可修复。
-	expectedLimit := defaultConfig.App.MaxProfileLimit
-	for _, k := range config.App.UsedCDKeys {
-		if k == "GITHUB_STAR_REWARD" {
-			expectedLimit += 3
-		} else {
-			expectedLimit += 3
-		}
-	}
-	if config.App.MaxProfileLimit < expectedLimit {
-		config.App.MaxProfileLimit = expectedLimit
+	// MaxProfileLimit = 0 表示无限制，不再根据兑换码计算最小值
+	if config.App.MaxProfileLimit < 0 {
+		config.App.MaxProfileLimit = 0
 	}
 
 	if config.Runtime.MaxMemoryMB <= 0 {
@@ -311,6 +315,12 @@ func normalizeConfig(config *Config) {
 	if config.LaunchServer.Port < 0 {
 		config.LaunchServer.Port = defaultConfig.LaunchServer.Port
 	}
+	if config.APIServer.Port < 0 {
+		config.APIServer.Port = defaultConfig.APIServer.Port
+	}
+	if strings.TrimSpace(config.IPFoxy.V2RayURL) == "" {
+		config.IPFoxy.V2RayURL = defaultConfig.IPFoxy.V2RayURL
+	}
 }
 
 func cloneInterceptorConfig(src InterceptorConfig) InterceptorConfig {
@@ -340,7 +350,7 @@ func DefaultConfig() *Config {
 				MinWidth:  1200,
 				MinHeight: 700,
 			},
-			MaxProfileLimit: 3,
+			MaxProfileLimit: 0, // 0 表示无限制
 			UsedCDKeys:      []string{},
 		},
 		Runtime: RuntimeConfig{
@@ -377,6 +387,12 @@ func DefaultConfig() *Config {
 		},
 		LaunchServer: LaunchServerConfig{
 			Port: 0,
+		},
+		APIServer: APIServerConfig{
+			Port: 49999,
+		},
+		IPFoxy: IPFoxyConfig{
+			V2RayURL: "socks5://127.0.0.1:10808",
 		},
 	}
 }

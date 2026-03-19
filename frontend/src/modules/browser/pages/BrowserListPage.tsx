@@ -2,15 +2,16 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Activity, CheckCircle, ChevronDown, ChevronRight, ChevronUp, Copy, Edit2, FileText, Key, Pencil, Play, Plus, RefreshCw, RotateCcw, Settings, Sliders, Square, Star, Trash2, XCircle, Gift, LayoutGrid, List } from 'lucide-react'
 import { Badge, Button, Card, FormItem, Input, Modal, StatCard, Table, Textarea, toast } from '../../../shared/components'
-import { fetchDashboardStats, redeemCDKey, redeemGithubStar, reloadConfig } from '../../dashboard/api'
+import { redeemCDKey, redeemGithubStar } from '../../dashboard/api'
 import type { TableColumn } from '../../../shared/components/Table'
-import type { BrowserCore, BrowserCoreInput, BrowserProfile, BrowserProxy, BrowserSettings, BrowserGroupWithCount } from '../types'
+import type { BrowserCore, BrowserCoreInput, BrowserProfile, BrowserProxy, BrowserSettings, BrowserGroupWithCount, BrowserRuntimeSummary } from '../types'
 import { InstanceFilterBar, EMPTY_FILTERS } from '../components/InstanceFilterBar'
 import type { InstanceFilters } from '../components/InstanceFilterBar'
 import { KeywordsModal } from '../components/KeywordsModal'
 import { EventsOn, EventsOff, BrowserOpenURL } from '../../../wailsjs/runtime/runtime'
 import { PROJECT_GITHUB_URL } from '../../../config/links'
 import { resolveActionErrorMessage } from '../utils/actionErrors'
+import { summarizeFingerprint, fingerprintCompleteness } from '../utils/fingerprintSerializer'
 import {
   copyBrowserProfile,
   deleteBrowserCore,
@@ -78,6 +79,37 @@ const formatTime = (value?: string) => {
   if (!value) return '-'
   const date = new Date(value)
   return Number.isNaN(date.getTime()) ? '-' : date.toLocaleString('zh-CN')
+}
+
+const getRuntimeSummary = (profile: BrowserProfile): BrowserRuntimeSummary => ({
+  running: profile.runtime?.running ?? profile.running,
+  debugPort: profile.runtime?.debugPort ?? profile.debugPort,
+  pid: profile.runtime?.pid ?? profile.pid,
+  lastError: profile.runtime?.lastError ?? profile.lastError,
+  lastStartAt: profile.runtime?.lastStartAt ?? profile.lastStartAt,
+  lastStopAt: profile.runtime?.lastStopAt ?? profile.lastStopAt,
+  effectiveProxy: profile.runtime?.effectiveProxy ?? profile.effectiveProxy,
+  requestedLaunchArgs: profile.runtime?.requestedLaunchArgs ?? profile.requestedLaunchArgs,
+  requestedStartUrls: profile.runtime?.requestedStartUrls ?? profile.requestedStartUrls,
+  wsEndpoint: profile.runtime?.wsEndpoint ?? profile.wsEndpoint,
+  resetUserData: profile.runtime?.resetUserData ?? profile.resetUserData,
+})
+
+const getRuntimeProxyText = (profile: BrowserProfile, proxies: BrowserProxy[]) => {
+  const runtime = getRuntimeSummary(profile)
+  if (runtime.effectiveProxy) return runtime.effectiveProxy
+  const proxy = proxies.find(item => item.proxyId === profile.proxyId)
+  if (proxy?.proxyConfig) return proxy.proxyConfig
+  if (profile.proxyConfig) return profile.proxyConfig
+  if (proxy?.proxyName) return proxy.proxyName
+  if (profile.proxyId) return profile.proxyId
+  return '-'
+}
+
+const summarizeRuntimeText = (value?: string, emptyText: string = '-') => {
+  const normalized = value?.trim()
+  if (!normalized) return emptyText
+  return normalized.length > 36 ? `${normalized.slice(0, 36)}…` : normalized
 }
 
 function LaunchCodeCell({ profileId, code, onRefresh }: { profileId: string; code: string; onRefresh: () => void }) {
@@ -277,7 +309,6 @@ export function BrowserListPage() {
   const [expandModalOpen, setExpandModalOpen] = useState(false)
   const [cdKey, setCdKey] = useState('')
   const [redeeming, setRedeeming] = useState(false)
-  const [maxProfileLimit, setMaxProfileLimit] = useState(3)
   const [promoModalMsg, setPromoModalMsg] = useState('')
 
   const loadProfiles = async () => {
@@ -304,20 +335,9 @@ export function BrowserListPage() {
     setCores(await fetchBrowserCores())
   }
 
-  const loadQuota = async () => {
-    try {
-      await reloadConfig()
-      const stats = await fetchDashboardStats()
-      setMaxProfileLimit(stats.maxProfileLimit || 3)
-    } catch {
-      // ignore
-    }
-  }
-
   useEffect(() => {
     loadProfiles()
     loadGroups()
-    loadQuota()
     fetchBrowserProxies().then(setProxies)
     fetchBrowserCores().then(setCores)
 
@@ -606,7 +626,6 @@ export function BrowserListPage() {
     if (result.success) {
       toast.success('兑换成功！此名额已到账')
       setCdKey('')
-      loadQuota()
     } else {
       setPromoModalMsg(result.message || '兑换失败')
     }
@@ -621,7 +640,6 @@ export function BrowserListPage() {
     if (starRes.success) {
       toast.success('感谢您的支持！已为您增加 3 个永久额度！')
       setCdKey('')
-      loadQuota()
     } else {
       toast.error(starRes.message || '领取失败')
     }
@@ -691,6 +709,28 @@ export function BrowserListPage() {
       },
     },
     {
+      key: 'fingerprintArgs',
+      title: '指纹摘要',
+      render: (value) => {
+        const summary = summarizeFingerprint(value || [])
+        const pct = fingerprintCompleteness(value || [])
+        return (
+          <div className="flex flex-col gap-0.5 max-w-[220px]">
+            <span className="text-xs text-[var(--color-text-secondary)] truncate" title={summary}>{summary}</span>
+            <div className="flex items-center gap-1.5">
+              <div className="flex-1 h-1 rounded-full bg-[var(--color-bg-secondary)] overflow-hidden">
+                <div
+                  className={`h-full rounded-full ${pct >= 70 ? 'bg-green-500' : pct >= 40 ? 'bg-amber-500' : 'bg-red-400'}`}
+                  style={{ width: `${pct}%` }}
+                />
+              </div>
+              <span className="text-[10px] text-[var(--color-text-muted)] tabular-nums">{pct}%</span>
+            </div>
+          </div>
+        )
+      },
+    },
+    {
       key: 'launchCode',
       title: '快捷打开码',
       render: (value, record) => <LaunchCodeCell profileId={record.profileId} code={value || ''} onRefresh={loadProfiles} />,
@@ -700,6 +740,22 @@ export function BrowserListPage() {
       title: '关键字',
       width: 200,
       render: (value) => <KeywordInlineRow keywords={value || []} />,
+    },
+    {
+      key: 'runtime',
+      title: '启动实况',
+      render: (_, record) => {
+        const runtime = getRuntimeSummary(record)
+        return (
+          <div className="flex flex-col gap-1 text-xs text-[var(--color-text-secondary)] max-w-[260px]">
+            <span>端口：{runtime.debugPort || '-'}</span>
+            <span title={getRuntimeProxyText(record, proxies)}>代理：{summarizeRuntimeText(getRuntimeProxyText(record, proxies))}</span>
+            <span>最近启动：{formatTime(runtime.lastStartAt)}</span>
+            <span>重置数据：{runtime.resetUserData ? '是' : '否'}</span>
+            <span>CDP：{runtime.wsEndpoint ? '可接管' : '未提供'}</span>
+          </div>
+        )
+      },
     },
     {
       key: 'updatedAt',
@@ -767,7 +823,7 @@ export function BrowserListPage() {
           <Button variant="secondary" size="sm" onClick={() => setHeaderCollapsed(prev => !prev)}>{headerCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}{headerCollapsed ? '展开面板' : '收起面板'}</Button>
           <Button variant="secondary" size="sm" onClick={loadProfiles}><RefreshCw className="w-4 h-4" />刷新</Button>
           <Button variant="secondary" size="sm" onClick={handleOpenSettings}><Sliders className="w-4 h-4" />基础配置</Button>
-          <Button variant="secondary" size="sm" onClick={() => { setCdKey(''); setExpandModalOpen(true); loadQuota() }} className="text-[var(--color-primary)] border-[var(--color-primary)] hover:bg-[var(--color-primary)]/10">
+          <Button variant="secondary" size="sm" onClick={() => { setCdKey(''); setExpandModalOpen(true) }} className="text-[var(--color-primary)] border-[var(--color-primary)] hover:bg-[var(--color-primary)]/10">
             <Gift className="w-4 h-4" />扩容实例
           </Button>
           <div className="flex items-center bg-[var(--color-bg-secondary)] rounded-md border border-[var(--color-border-default)] p-0.5 ml-2">
@@ -906,8 +962,46 @@ export function BrowserListPage() {
                         <div className="mt-0.5"><LaunchCodeCell profileId={record.profileId} code={record.launchCode || ''} onRefresh={loadProfiles} /></div>
                       </div>
                       <div className="flex flex-col gap-0.5">
+                        <span className="text-xs text-[var(--color-text-muted)] font-medium">指纹摘要</span>
+                        <span className="text-xs text-[var(--color-text-primary)] truncate" title={summarizeFingerprint(record.fingerprintArgs || [])}>
+                          {summarizeFingerprint(record.fingerprintArgs || [])}
+                        </span>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <div className="flex-1 h-1 rounded-full bg-[var(--color-bg-secondary)] overflow-hidden">
+                            {(() => { const pct = fingerprintCompleteness(record.fingerprintArgs || []); return <div className={`h-full rounded-full ${pct >= 70 ? 'bg-green-500' : pct >= 40 ? 'bg-amber-500' : 'bg-red-400'}`} style={{ width: `${pct}%` }} /> })()}
+                          </div>
+                          <span className="text-[10px] text-[var(--color-text-muted)] tabular-nums">{fingerprintCompleteness(record.fingerprintArgs || [])}%</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 py-2 border-t border-[var(--color-border-muted)]/50">
+                      <div className="flex flex-col gap-0.5">
                         <span className="text-xs text-[var(--color-text-muted)] font-medium">上次更新时间</span>
                         <span className="text-xs text-[var(--color-text-primary)]">{formatTime(record.updatedAt)}</span>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-4 py-2 border-t border-[var(--color-border-muted)]/50">
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-xs text-[var(--color-text-muted)] font-medium">调试端口</span>
+                        <span className="text-xs text-[var(--color-text-primary)]">{record.debugPort || '-'}</span>
+                      </div>
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-xs text-[var(--color-text-muted)] font-medium">实际代理</span>
+                        <span className="text-xs text-[var(--color-text-primary)]" title={getRuntimeProxyText(record, proxies)}>{summarizeRuntimeText(getRuntimeProxyText(record, proxies))}</span>
+                      </div>
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-xs text-[var(--color-text-muted)] font-medium">最近启动</span>
+                        <span className="text-xs text-[var(--color-text-primary)]">{formatTime(record.lastStartAt)}</span>
+                      </div>
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-xs text-[var(--color-text-muted)] font-medium">重置数据</span>
+                        <span className="text-xs text-[var(--color-text-primary)]">{record.resetUserData ? '是' : '否'}</span>
+                      </div>
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-xs text-[var(--color-text-muted)] font-medium">CDP 接入</span>
+                        <span className="text-xs text-[var(--color-text-primary)]">{record.wsEndpoint ? '可接管' : '未提供'}</span>
                       </div>
                     </div>
 
@@ -1042,10 +1136,10 @@ export function BrowserListPage() {
               <p className="text-xs text-[var(--color-text-muted)] mt-1">每个配置都需要消耗 1 个实例额度</p>
             </div>
             <div className="text-right">
-              <span className={`text-2xl font-semibold ${profiles.length >= maxProfileLimit ? 'text-red-500' : 'text-[var(--color-success)]'}`}>
+              <span className={`text-2xl font-semibold text-[var(--color-success)]`}>
                 {profiles.length}
               </span>
-              <span className="text-sm text-[var(--color-text-muted)] ml-1">/ {maxProfileLimit}</span>
+              <span className="text-sm text-[var(--color-text-muted)] ml-1">/ ∞</span>
             </div>
           </div>
 

@@ -4,7 +4,9 @@ import (
 	"ant-chrome/backend/internal/browser"
 	"ant-chrome/backend/internal/logger"
 	"ant-chrome/backend/internal/proxy"
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -20,15 +22,15 @@ import (
 // ============================================================================
 
 func (a *App) BrowserInstanceStart(profileId string) (*BrowserProfile, error) {
-	return a.browserInstanceStartInternal(profileId, nil, nil, false)
+	return a.browserInstanceStartInternal(profileId, nil, nil, false, false)
 }
 
 // BrowserInstanceStartWithParams 通过额外参数启动实例（仅本次启动生效，不落库）
 func (a *App) BrowserInstanceStartWithParams(profileId string, extraLaunchArgs []string, startURLs []string, skipDefaultStartURLs bool) (*BrowserProfile, error) {
-	return a.browserInstanceStartInternal(profileId, extraLaunchArgs, startURLs, skipDefaultStartURLs)
+	return a.browserInstanceStartInternal(profileId, extraLaunchArgs, startURLs, skipDefaultStartURLs, false)
 }
 
-func (a *App) browserInstanceStartInternal(profileId string, extraLaunchArgs []string, startURLs []string, skipDefaultStartURLs bool) (*BrowserProfile, error) {
+func (a *App) browserInstanceStartInternal(profileId string, extraLaunchArgs []string, startURLs []string, skipDefaultStartURLs bool, resetUserData bool) (*BrowserProfile, error) {
 	log := logger.New("Browser")
 	a.browserMgr.Mutex.Lock()
 	defer a.browserMgr.Mutex.Unlock()
@@ -57,12 +59,23 @@ func (a *App) browserInstanceStartInternal(profileId string, extraLaunchArgs []s
 	}
 
 	userDataDir := a.browserMgr.ResolveUserDataDir(profile)
+
+	// 重置用户数据：删除整个 user-data-dir，启动时会重新创建
+	if resetUserData {
+		log.Info("重置用户数据", logger.F("profile_id", profileId), logger.F("dir", userDataDir))
+		if err := os.RemoveAll(userDataDir); err != nil {
+			log.Error("重置用户数据失败", logger.F("profile_id", profileId), logger.F("dir", userDataDir), logger.F("error", err))
+		}
+	}
+
+
 	if err := os.MkdirAll(userDataDir, 0755); err != nil {
 		startErr := fmt.Errorf("实例启动失败：无法创建用户数据目录 %s。原因：%w。请检查目录权限或路径配置。", userDataDir, err)
 		log.Error("用户数据目录创建失败", logger.F("profile_id", profileId), logger.F("dir", userDataDir), logger.F("error", err), logger.F("reason", startErr.Error()))
 		profile.LastError = startErr.Error()
 		return profile, startErr
 	}
+	applyPasswordManagerPreference(userDataDir, profile.Preferences)
 	// 每次启动时合并默认书签（已存在的 URL 不重复添加）
 	if err := browser.EnsureDefaultBookmarks(userDataDir, a.BookmarkList()); err != nil {
 		log.Error("默认书签写入失败", logger.F("error", err.Error()))
@@ -119,6 +132,24 @@ func (a *App) browserInstanceStartInternal(profileId string, extraLaunchArgs []s
 		}
 		effectiveProxy = socksURL
 		log.Info("sing-box 桥接成功", logger.F("socks_url", socksURL))
+	} else if proxy.IsIPFoxyProxy(resolvedProxyConfig) {
+		// IPFoxy SOCKS5 认证代理桥接
+		socksURL, bridgeErr := a.ipfoxyMgr.EnsureBridge(resolvedProxyConfig)
+		if bridgeErr != nil {
+			startErr := fmt.Errorf("实例启动失败：IPFoxy 代理桥接启动失败。原因：%v。请检查 V2Ray 是否运行、Python 是否安装，以及代理配置是否正确。", bridgeErr)
+			log.Error("IPFoxy 桥接失败", logger.F("error", bridgeErr.Error()), logger.F("reason", startErr.Error()))
+			profile.LastError = startErr.Error()
+			if a.ctx != nil {
+				runtime.EventsEmit(a.ctx, "proxy:bridge:failed", map[string]interface{}{
+					"profileId":   profileId,
+					"profileName": profile.ProfileName,
+					"error":       startErr.Error(),
+				})
+			}
+			return profile, startErr
+		}
+		effectiveProxy = socksURL
+		log.Info("IPFoxy 桥接成功", logger.F("socks_url", socksURL))
 	} else if proxy.RequiresBridge(resolvedProxyConfig, proxies, profile.ProxyId) {
 		// vmess / vless / trojan / ss → xray 桥接
 		socksURL, bridgeKey, bridgeErr := a.xrayMgr.AcquireBridge(resolvedProxyConfig, proxies, profile.ProxyId)
@@ -190,7 +221,6 @@ func (a *App) browserInstanceStartInternal(profileId string, extraLaunchArgs []s
 	}
 
 	cmd := exec.Command(chromeBinaryPath, args...)
-	hideWindow(cmd)
 	cmd.Dir = filepath.Dir(chromeBinaryPath)
 	if err := cmd.Start(); err != nil {
 		startErr := fmt.Errorf("%s", describeChromeProcessStartError(chromeBinaryPath, err))
@@ -215,6 +245,24 @@ func (a *App) browserInstanceStartInternal(profileId string, extraLaunchArgs []s
 	profile.Pid = cmd.Process.Pid
 	profile.LastStartAt = time.Now().Format(time.RFC3339)
 	profile.LastError = ""
+	profile.EffectiveProxy = effectiveProxy
+	profile.RequestedLaunchArgs = append([]string{}, normalizeNonEmptyStrings(extraLaunchArgs)...)
+	profile.RequestedStartUrls = append([]string{}, normalizeNonEmptyStrings(startURLs)...)
+	profile.ResetUserData = resetUserData
+	profile.WSEndpoint = firstWebSocketDebuggerURL(debugPort)
+	profile.Runtime = browser.RuntimeSummary{
+		EffectiveProxy:      profile.EffectiveProxy,
+		RequestedLaunchArgs: append([]string{}, profile.RequestedLaunchArgs...),
+		RequestedStartUrls:  append([]string{}, profile.RequestedStartUrls...),
+		WSEndpoint:          profile.WSEndpoint,
+		ResetUserData:       profile.ResetUserData,
+		LastStartAt:         profile.LastStartAt,
+		LastStopAt:          profile.LastStopAt,
+		LastError:           profile.LastError,
+		DebugPort:           profile.DebugPort,
+		Pid:                 profile.Pid,
+		Running:             profile.Running,
+	}
 	if acquiredXrayBridgeKey != "" {
 		a.bindProfileXrayBridge(profileId, acquiredXrayBridgeKey)
 		releaseXrayBridge = false
@@ -227,6 +275,38 @@ func (a *App) browserInstanceStartInternal(profileId string, extraLaunchArgs []s
 
 	go a.waitBrowserProcess(profileId, cmd)
 	return profile, nil
+}
+
+func applyPasswordManagerPreference(userDataDir string, prefs *browser.ProfilePreferences) {
+	if prefs == nil {
+		return
+	}
+
+	defaultDir := filepath.Join(userDataDir, "Default")
+	_ = os.MkdirAll(defaultDir, 0755)
+	prefsPath := filepath.Join(defaultDir, "Preferences")
+
+	var root map[string]any
+	if data, err := os.ReadFile(prefsPath); err == nil && len(data) > 0 {
+		_ = json.Unmarshal(data, &root)
+	}
+	if root == nil {
+		root = map[string]any{}
+	}
+
+	profileObj, _ := root["profile"].(map[string]any)
+	if profileObj == nil {
+		profileObj = map[string]any{}
+	}
+
+	passwordEnabled := !prefs.DisablePasswordPrompt
+	root["credentials_enable_service"] = passwordEnabled
+	profileObj["password_manager_enabled"] = passwordEnabled
+	root["profile"] = profileObj
+
+	if data, err := json.MarshalIndent(root, "", "  "); err == nil {
+		_ = os.WriteFile(prefsPath, data, 0644)
+	}
 }
 
 func (a *App) BrowserInstanceStop(profileId string) (*BrowserProfile, error) {
@@ -250,8 +330,27 @@ func (a *App) BrowserInstanceStop(profileId string) (*BrowserProfile, error) {
 
 	profile.Running = false
 	profile.LastStopAt = time.Now().Format(time.RFC3339)
+	profile.WSEndpoint = ""
+	profile.Runtime = browser.RuntimeSummary{
+		EffectiveProxy:      profile.EffectiveProxy,
+		RequestedLaunchArgs: append([]string{}, profile.RequestedLaunchArgs...),
+		RequestedStartUrls:  append([]string{}, profile.RequestedStartUrls...),
+		WSEndpoint:          "",
+		ResetUserData:       profile.ResetUserData,
+		LastStartAt:         profile.LastStartAt,
+		LastStopAt:          profile.LastStopAt,
+		LastError:           profile.LastError,
+		DebugPort:           profile.DebugPort,
+		Pid:                 profile.Pid,
+		Running:             false,
+	}
 	delete(a.browserMgr.BrowserProcesses, profileId)
 	a.releaseProfileXrayBridge(profileId)
+
+	// 释放 IPFoxy 桥接
+	if proxy.IsIPFoxyProxy(profile.ProxyConfig) {
+		a.ipfoxyMgr.ReleaseBridge(profile.ProxyConfig)
+	}
 
 	log.Info("实例停止", logger.F("profile_id", profileId))
 	return profile, nil
@@ -431,6 +530,19 @@ func (a *App) waitBrowserProcess(profileId string, cmd *exec.Cmd) {
 	if exists {
 		profile.Running = false
 		profile.LastStopAt = time.Now().Format(time.RFC3339)
+		profile.Runtime = browser.RuntimeSummary{
+			EffectiveProxy:      profile.EffectiveProxy,
+			RequestedLaunchArgs: append([]string{}, profile.RequestedLaunchArgs...),
+			RequestedStartUrls:  append([]string{}, profile.RequestedStartUrls...),
+			WSEndpoint:          "",
+			ResetUserData:       profile.ResetUserData,
+			LastStartAt:         profile.LastStartAt,
+			LastStopAt:          profile.LastStopAt,
+			LastError:           profile.LastError,
+			DebugPort:           profile.DebugPort,
+			Pid:                 profile.Pid,
+			Running:             false,
+		}
 	}
 	delete(a.browserMgr.BrowserProcesses, profileId)
 	a.browserMgr.Mutex.Unlock()
@@ -448,6 +560,19 @@ func (a *App) waitBrowserProcess(profileId string, cmd *exec.Cmd) {
 		if exists {
 			profileName = profile.ProfileName
 			profile.LastError = fmt.Sprintf("实例运行异常退出：%s", err.Error())
+			profile.Runtime = browser.RuntimeSummary{
+				EffectiveProxy:      profile.EffectiveProxy,
+				RequestedLaunchArgs: append([]string{}, profile.RequestedLaunchArgs...),
+				RequestedStartUrls:  append([]string{}, profile.RequestedStartUrls...),
+				WSEndpoint:          "",
+				ResetUserData:       profile.ResetUserData,
+				LastStartAt:         profile.LastStartAt,
+				LastStopAt:          profile.LastStopAt,
+				LastError:           profile.LastError,
+				DebugPort:           profile.DebugPort,
+				Pid:                 profile.Pid,
+				Running:             false,
+			}
 		}
 		log.Error("浏览器进程异常退出", logger.F("profile_id", profileId), logger.F("profile_name", profileName), logger.F("error", err))
 		runtime.EventsEmit(a.ctx, "browser:instance:crashed", map[string]interface{}{
@@ -569,3 +694,32 @@ func isProcessAliveWindows(pid int) (bool, error) {
 	token := fmt.Sprintf("\",\"%d\",", pid)
 	return strings.Contains(line, token), nil
 }
+
+func firstWebSocketDebuggerURL(debugPort int) string {
+	resp, err := http.Get(fmt.Sprintf("http://127.0.0.1:%d/json", debugPort))
+	if err != nil {
+		return ""
+	}
+	defer resp.Body.Close()
+
+	var targets []struct {
+		Type                 string `json:"type"`
+		WebSocketDebuggerURL string `json:"webSocketDebuggerUrl"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&targets); err != nil {
+		return ""
+	}
+
+	for _, target := range targets {
+		if target.Type == "page" && target.WebSocketDebuggerURL != "" {
+			return target.WebSocketDebuggerURL
+		}
+	}
+	for _, target := range targets {
+		if target.WebSocketDebuggerURL != "" {
+			return target.WebSocketDebuggerURL
+		}
+	}
+	return ""
+}
+

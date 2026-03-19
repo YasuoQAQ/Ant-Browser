@@ -13,20 +13,20 @@ export async function fetchDashboardStats(): Promise<DashboardStats> {
   if (bindings?.GetDashboardStats) {
     try {
       const data = await bindings.GetDashboardStats()
-      const licenseStatus = bindings.GetLicenseStatus ? await bindings.GetLicenseStatus() : { maxLimit: 3 }
+      const licenseStatus = bindings.GetLicenseStatus ? await bindings.GetLicenseStatus() : { maxLimit: 0 }
       return {
         totalInstances: data?.totalInstances ?? 0,
         runningInstances: data?.runningInstances ?? 0,
         proxyCount: data?.proxyCount ?? 0,
         coreCount: data?.coreCount ?? 0,
         memUsedMB: data?.memUsedMB ?? 0,
-        maxProfileLimit: licenseStatus?.maxLimit ?? 3,
+        maxProfileLimit: licenseStatus?.maxLimit ?? 0,
       }
     } catch (e) {
       console.error('fetchDashboardStats error:', e)
     }
   }
-  return { totalInstances: 0, runningInstances: 0, proxyCount: 0, coreCount: 0, memUsedMB: 0, maxProfileLimit: 3 }
+  return { totalInstances: 0, runningInstances: 0, proxyCount: 0, coreCount: 0, memUsedMB: 0, maxProfileLimit: 0 }
 }
 
 export async function redeemCDKey(cdkey: string): Promise<{ success: boolean, message?: string }> {

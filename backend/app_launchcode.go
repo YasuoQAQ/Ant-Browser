@@ -13,7 +13,7 @@ func (a *App) StartInstance(profileId string) (*browser.Profile, error) {
 
 // StartInstanceWithParams 实现 launchcode.BrowserStarterWithParams 接口
 func (a *App) StartInstanceWithParams(profileId string, params launchcode.LaunchRequestParams) (*browser.Profile, error) {
-	return a.BrowserInstanceStartWithParams(profileId, params.LaunchArgs, params.StartURLs, params.SkipDefaultStartURLs)
+	return a.browserInstanceStartInternal(profileId, params.LaunchArgs, params.StartURLs, params.SkipDefaultStartURLs, params.ResetUserData)
 }
 
 // BrowserProfileGetCode 获取实例的 LaunchCode（Wails 绑定）

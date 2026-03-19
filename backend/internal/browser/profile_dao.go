@@ -31,7 +31,8 @@ func (d *SQLiteProfileDAO) List() ([]*Profile, error) {
 	rows, err := d.db.Query(`
 		SELECT profile_id, profile_name, user_data_dir, core_id,
 		       fingerprint_args, proxy_id, proxy_config, launch_args,
-		       tags, keywords, group_id, created_at, updated_at
+		       tags, keywords, group_id, created_at, updated_at,
+		       fingerprint_config, preferences
 		FROM browser_profiles ORDER BY created_at ASC`)
 	if err != nil {
 		return nil, fmt.Errorf("查询实例列表失败: %w", err)
@@ -54,7 +55,8 @@ func (d *SQLiteProfileDAO) GetById(profileId string) (*Profile, error) {
 	row := d.db.QueryRow(`
 		SELECT profile_id, profile_name, user_data_dir, core_id,
 		       fingerprint_args, proxy_id, proxy_config, launch_args,
-		       tags, keywords, group_id, created_at, updated_at
+		       tags, keywords, group_id, created_at, updated_at,
+		       fingerprint_config, preferences
 		FROM browser_profiles WHERE profile_id = ?`, profileId)
 	p, err := scanProfile(row)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -70,6 +72,15 @@ func (d *SQLiteProfileDAO) Upsert(profile *Profile) error {
 	tags, _ := json.Marshal(profile.Tags)
 	keywords, _ := json.Marshal(profile.Keywords)
 
+	fingerprintConfig := []byte("{}")
+	if profile.FingerprintConfig != nil {
+		fingerprintConfig, _ = json.Marshal(profile.FingerprintConfig)
+	}
+	preferencesJSON := []byte("{}")
+	if profile.Preferences != nil {
+		preferencesJSON, _ = json.Marshal(profile.Preferences)
+	}
+
 	now := time.Now().Format(time.RFC3339)
 	if profile.CreatedAt == "" {
 		profile.CreatedAt = now
@@ -81,24 +92,27 @@ func (d *SQLiteProfileDAO) Upsert(profile *Profile) error {
 	_, err := d.db.Exec(`
 		INSERT INTO browser_profiles
 		  (profile_id, profile_name, user_data_dir, core_id, fingerprint_args,
-		   proxy_id, proxy_config, launch_args, tags, keywords, group_id, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		   proxy_id, proxy_config, launch_args, tags, keywords, group_id,
+		   created_at, updated_at, fingerprint_config, preferences)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(profile_id) DO UPDATE SET
-		  profile_name     = excluded.profile_name,
-		  user_data_dir    = excluded.user_data_dir,
-		  core_id          = excluded.core_id,
-		  fingerprint_args = excluded.fingerprint_args,
-		  proxy_id         = excluded.proxy_id,
-		  proxy_config     = excluded.proxy_config,
-		  launch_args      = excluded.launch_args,
-		  tags             = excluded.tags,
-		  keywords         = excluded.keywords,
-		  group_id         = excluded.group_id,
-		  updated_at       = excluded.updated_at`,
+		  profile_name       = excluded.profile_name,
+		  user_data_dir      = excluded.user_data_dir,
+		  core_id            = excluded.core_id,
+		  fingerprint_args   = excluded.fingerprint_args,
+		  proxy_id           = excluded.proxy_id,
+		  proxy_config       = excluded.proxy_config,
+		  launch_args        = excluded.launch_args,
+		  tags               = excluded.tags,
+		  keywords           = excluded.keywords,
+		  group_id           = excluded.group_id,
+		  updated_at         = excluded.updated_at,
+		  fingerprint_config = excluded.fingerprint_config,
+		  preferences        = excluded.preferences`,
 		profile.ProfileId, profile.ProfileName, profile.UserDataDir, profile.CoreId,
 		string(fingerprintArgs), profile.ProxyId, profile.ProxyConfig,
 		string(launchArgs), string(tags), string(keywords), profile.GroupId,
-		profile.CreatedAt, profile.UpdatedAt,
+		profile.CreatedAt, profile.UpdatedAt, string(fingerprintConfig), string(preferencesJSON),
 	)
 	if err != nil {
 		return fmt.Errorf("保存实例配置失败: %w", err)
@@ -137,14 +151,16 @@ func (d *SQLiteProfileDAO) ListByGroup(groupId string, includeChildren bool, chi
 		rows, err = d.db.Query(fmt.Sprintf(`
 			SELECT profile_id, profile_name, user_data_dir, core_id,
 			       fingerprint_args, proxy_id, proxy_config, launch_args,
-			       tags, keywords, group_id, created_at, updated_at
+			       tags, keywords, group_id, created_at, updated_at,
+			       fingerprint_config, preferences
 			FROM browser_profiles WHERE group_id IN (%s) ORDER BY created_at ASC`, inClause), args...)
 	} else {
 		// 仅查询指定分组
 		rows, err = d.db.Query(`
 			SELECT profile_id, profile_name, user_data_dir, core_id,
 			       fingerprint_args, proxy_id, proxy_config, launch_args,
-			       tags, keywords, group_id, created_at, updated_at
+			       tags, keywords, group_id, created_at, updated_at,
+			       fingerprint_config, preferences
 			FROM browser_profiles WHERE group_id = ? ORDER BY created_at ASC`, groupId)
 	}
 
@@ -194,13 +210,15 @@ type scanner interface {
 func scanProfile(s scanner) (*Profile, error) {
 	var (
 		fingerprintArgsJSON, launchArgsJSON, tagsJSON, keywordsJSON string
+		fingerprintConfigJSON                                       string
+		preferencesJSON                                              string
 		p                                                           Profile
 	)
 	err := s.Scan(
 		&p.ProfileId, &p.ProfileName, &p.UserDataDir, &p.CoreId,
 		&fingerprintArgsJSON, &p.ProxyId, &p.ProxyConfig,
 		&launchArgsJSON, &tagsJSON, &keywordsJSON, &p.GroupId,
-		&p.CreatedAt, &p.UpdatedAt,
+		&p.CreatedAt, &p.UpdatedAt, &fingerprintConfigJSON, &preferencesJSON,
 	)
 	if err != nil {
 		return nil, err
@@ -220,6 +238,22 @@ func scanProfile(s scanner) (*Profile, error) {
 	}
 	if p.Keywords == nil {
 		p.Keywords = []string{}
+	}
+	// 解析结构化指纹配置
+	if fingerprintConfigJSON != "" && fingerprintConfigJSON != "{}" {
+		var cfg FingerprintConfig
+		if json.Unmarshal([]byte(fingerprintConfigJSON), &cfg) == nil && !cfg.IsEmpty() {
+			p.FingerprintConfig = &cfg
+		}
+	}
+	// 如果无结构化配置但有 args，自动迁移
+	MigrateFingerprintArgs(&p)
+	// 解析偏好设置
+	if preferencesJSON != "" && preferencesJSON != "{}" {
+		var prefs ProfilePreferences
+		if json.Unmarshal([]byte(preferencesJSON), &prefs) == nil {
+			p.Preferences = &prefs
+		}
 	}
 	return &p, nil
 }
